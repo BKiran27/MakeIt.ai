@@ -1,5 +1,5 @@
 {
   "name": "MakeIt.ai - DIY Project Generator",
   "description": "A sleek, minimal web app that generates DIY projects based on available materials using AI.",
-  "requestFramePermissions": []
+  "requestFramePermissions": ["microphone"]
 }

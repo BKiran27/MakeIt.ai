@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
 import * as Toast from '@radix-ui/react-toast';
+import * as Tooltip from '@radix-ui/react-tooltip';
 import Markdown from 'react-markdown';
 
 interface Project {
@@ -24,7 +25,27 @@ interface Project {
   category: string;
 }
 
-type Category = 'Home Improvement' | 'Crafts' | 'Gardening' | 'Surprise Me';
+type Category = string;
+
+const SimpleTooltip = ({ children, content, side = "top" }: { children: React.ReactNode, content: React.ReactNode, side?: "top" | "right" | "bottom" | "left" }) => (
+  <Tooltip.Provider delayDuration={200}>
+    <Tooltip.Root>
+      <Tooltip.Trigger asChild>
+        {children}
+      </Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Content 
+          side={side} 
+          sideOffset={5} 
+          className="z-[100] px-2.5 py-1.5 bg-zinc-900 dark:bg-zinc-100 text-zinc-50 dark:text-zinc-900 text-[11px] font-medium tracking-wide rounded-md shadow-md animate-in fade-in zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95"
+        >
+          {content}
+          <Tooltip.Arrow className="fill-zinc-900 dark:fill-zinc-100" />
+        </Tooltip.Content>
+      </Tooltip.Portal>
+    </Tooltip.Root>
+  </Tooltip.Provider>
+);
 
 export default function DIYGenerator() {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
@@ -38,6 +59,10 @@ export default function DIYGenerator() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [savedProjects, setSavedProjects] = useState<Project[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  // AI Category Suggestion State
+  const [suggestedCategory, setSuggestedCategory] = useState<string | null>(null);
+  const [isSuggestingCategory, setIsSuggestingCategory] = useState(false);
 
   // Toast state
   const [toastOpen, setToastOpen] = useState(false);
@@ -83,6 +108,35 @@ export default function DIYGenerator() {
     localStorage.setItem('diy_saved_projects', JSON.stringify(savedProjects));
   }, [savedProjects]);
 
+  useEffect(() => {
+    if (materials.length === 0) {
+      setSuggestedCategory(null);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsSuggestingCategory(true);
+      try {
+        const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+        if (!apiKey) return;
+        const ai = new GoogleGenAI({ apiKey });
+        const response = await ai.models.generateContent({
+          model: 'gemini-3.1-flash-lite-preview',
+          contents: `Based on a user having these materials for a DIY project: ${materials.join(', ')}. Suggest ONE highly relevant, specific DIY project category (e.g., Woodworking, Upcycled Fashion, Electronics, Pallet Furniture). Respond with ONLY the category name, max 3 words. Do not use quotes or markdown.`,
+          config: { temperature: 0.3 }
+        });
+        const text = response.text?.trim().replace(/['"]/g, '') || null;
+        if (text && text.length > 0 && text.length < 30) {
+           setSuggestedCategory(text);
+        }
+      } catch (err) {
+        console.error("Failed to suggest category", err);
+      } finally {
+        setIsSuggestingCategory(false);
+      }
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [materials]);
+
   const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
 
   const showToast = (message: string) => {
@@ -115,6 +169,8 @@ export default function DIYGenerator() {
     
     setError(null);
     setIsGenerating(true);
+    setProjects([]);
+    setView('results');
 
     try {
       const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
@@ -165,7 +221,6 @@ export default function DIYGenerator() {
       const data = JSON.parse(response.text || '[]');
       const projectsWithIds = data.map((p: any) => ({ ...p, id: crypto.randomUUID() }));
       setProjects(projectsWithIds);
-      setView('results');
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Failed to generate projects. Please try again.");
@@ -241,6 +296,25 @@ export default function DIYGenerator() {
     // Video Tutorials State
     const [videos, setVideos] = useState<{title: string, url: string}[] | null>(null);
     const [isFindingVideos, setIsFindingVideos] = useState(false);
+
+    const getMaterialAvailability = (reqMat: string, userMats: string[]) => {
+      if (isSavedView) return 'unknown';
+      if (userMats.length === 0) return 'missing';
+      const r = reqMat.toLowerCase();
+      const u = userMats.map(m => m.toLowerCase());
+      
+      if (u.some(m => r === m || r.includes(m) || m.includes(r))) {
+        return 'full';
+      }
+      
+      const rWords = r.split(/[\s,-]+/);
+      for (const um of u) {
+        const uWords = um.split(/[\s,-]+/);
+        const intersection = rWords.filter(w => uWords.includes(w) && w.length > 2);
+        if (intersection.length > 0) return 'partial';
+      }
+      return 'missing';
+    };
 
     const handleFindVideos = async (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -390,20 +464,24 @@ export default function DIYGenerator() {
               {project.title}
             </h3>
             <div className="flex items-center gap-1 shrink-0 print:hidden" onClick={e => e.stopPropagation()}>
-              <button 
-                onClick={() => handleShare(project)}
-                className="p-1.5 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 rounded-md transition-colors"
-                title="Share"
-              >
-                <Share2 className="w-4 h-4" />
-              </button>
-              <button 
-                onClick={() => toggleSaveProject(project)}
-                className={`p-1.5 rounded-md transition-colors ${isSaved ? 'text-indigo-500' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'}`}
-                title={isSaved ? "Remove from saved" : "Save project"}
-              >
-                {isSaved ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
-              </button>
+              <SimpleTooltip content="Share Project">
+                <button 
+                  onClick={() => handleShare(project)}
+                  className="p-1.5 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 rounded-md transition-colors"
+                  title="Share"
+                >
+                  <Share2 className="w-4 h-4" />
+                </button>
+              </SimpleTooltip>
+              <SimpleTooltip content={isSaved ? "Remove from saved" : "Save project"}>
+                <button 
+                  onClick={() => toggleSaveProject(project)}
+                  className={`p-1.5 rounded-md transition-colors ${isSaved ? 'text-indigo-500' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'}`}
+                  title={isSaved ? "Remove from saved" : "Save project"}
+                >
+                  {isSaved ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
+                </button>
+              </SimpleTooltip>
             </div>
           </div>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
@@ -461,20 +539,36 @@ export default function DIYGenerator() {
                   <h4 className="text-[11px] font-mono uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-3">
                     Materials Needed
                   </h4>
-                  <ul className="flex flex-wrap gap-1.5">
+                  <ul className="flex flex-wrap gap-2 text-xs">
                     {project.materialsNeeded.map((mat, i) => {
-                      const isAvailable = !isSavedView && materials.some(m => mat.toLowerCase().includes(m));
+                      const avail = getMaterialAvailability(mat, materials);
+                      let styleClass = 'bg-zinc-50 dark:bg-zinc-900/50 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800';
+                      let dotClass = 'bg-zinc-400';
+                      
+                      if (avail === 'full') {
+                        styleClass = 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30';
+                        dotClass = 'bg-emerald-500';
+                      } else if (avail === 'partial') {
+                        styleClass = 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-500/30';
+                        dotClass = 'bg-amber-500';
+                      } else if (avail === 'missing') {
+                        styleClass = 'bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-500/30';
+                        dotClass = 'bg-rose-500';
+                      }
+
                       return (
-                        <li 
-                          key={i} 
-                          className={`text-xs px-2.5 py-1 rounded-md border ${
-                            isAvailable 
-                              ? 'bg-zinc-900 dark:bg-zinc-100 text-zinc-50 dark:text-zinc-900 border-zinc-900 dark:border-zinc-100' 
-                              : 'bg-zinc-50 dark:bg-zinc-900/50 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800'
-                          }`}
-                        >
-                          {mat}
-                        </li>
+                        <SimpleTooltip key={i} content={
+                          avail === 'full' ? 'Directly available' :
+                          avail === 'partial' ? 'Partially matches your materials' :
+                          avail === 'missing' ? 'Not in your materials list' : 'Availability unknown'
+                        }>
+                          <li 
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border cursor-help transition-colors ${styleClass}`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotClass}`} />
+                            {mat}
+                          </li>
+                        </SimpleTooltip>
                       );
                     })}
                   </ul>
@@ -505,14 +599,16 @@ export default function DIYGenerator() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {/* Deep Dive Button */}
                     {!deepDiveResult ? (
-                      <button
-                        onClick={handleDeepDive}
-                        disabled={isDeepDiving}
-                        className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-zinc-100 dark:bg-zinc-800/50 text-zinc-700 dark:text-zinc-300 font-medium text-xs hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50 border border-zinc-200 dark:border-zinc-700/50"
-                      >
-                        {isDeepDiving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                        {isDeepDiving ? 'Analyzing...' : 'Deep Dive Analysis'}
-                      </button>
+                      <SimpleTooltip content="Get a detailed AI breakdown and variations">
+                        <button
+                          onClick={handleDeepDive}
+                          disabled={isDeepDiving}
+                          className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-zinc-100 dark:bg-zinc-800/50 text-zinc-700 dark:text-zinc-300 font-medium text-xs hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50 border border-zinc-200 dark:border-zinc-700/50"
+                        >
+                          {isDeepDiving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                          {isDeepDiving ? 'Analyzing...' : 'Deep Dive Analysis'}
+                        </button>
+                      </SimpleTooltip>
                     ) : (
                       <div className="col-span-1 sm:col-span-2 space-y-3 bg-zinc-50 dark:bg-zinc-900/30 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800/80">
                         <h4 className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
@@ -527,14 +623,16 @@ export default function DIYGenerator() {
 
                     {/* Search Grounding Button */}
                     {!searchResult ? (
-                      <button
-                        onClick={handleSearch}
-                        disabled={isSearching}
-                        className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-zinc-100 dark:bg-zinc-800/50 text-zinc-700 dark:text-zinc-300 font-medium text-xs hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50 border border-zinc-200 dark:border-zinc-700/50"
-                      >
-                        {isSearching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
-                        {isSearching ? 'Searching...' : 'Search Tips & Sourcing'}
-                      </button>
+                      <SimpleTooltip content="Search the web for tips and sourcing info">
+                        <button
+                          onClick={handleSearch}
+                          disabled={isSearching}
+                          className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-zinc-100 dark:bg-zinc-800/50 text-zinc-700 dark:text-zinc-300 font-medium text-xs hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50 border border-zinc-200 dark:border-zinc-700/50"
+                        >
+                          {isSearching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
+                          {isSearching ? 'Searching...' : 'Search Tips & Sourcing'}
+                        </button>
+                      </SimpleTooltip>
                     ) : (
                       <div className="col-span-1 sm:col-span-2 space-y-3 bg-zinc-50 dark:bg-zinc-900/30 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800/80">
                         <h4 className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
@@ -561,14 +659,16 @@ export default function DIYGenerator() {
 
                     {/* Find Videos Button */}
                     {!videos ? (
-                      <button
-                        onClick={handleFindVideos}
-                        disabled={isFindingVideos}
-                        className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-zinc-100 dark:bg-zinc-800/50 text-zinc-700 dark:text-zinc-300 font-medium text-xs hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50 border border-zinc-200 dark:border-zinc-700/50"
-                      >
-                        {isFindingVideos ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Youtube className="w-3.5 h-3.5" />}
-                        {isFindingVideos ? 'Finding...' : 'Watch Tutorials'}
-                      </button>
+                      <SimpleTooltip content="Find YouTube tutorials for this project">
+                        <button
+                          onClick={handleFindVideos}
+                          disabled={isFindingVideos}
+                          className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-zinc-100 dark:bg-zinc-800/50 text-zinc-700 dark:text-zinc-300 font-medium text-xs hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50 border border-zinc-200 dark:border-zinc-700/50"
+                        >
+                          {isFindingVideos ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Youtube className="w-3.5 h-3.5" />}
+                          {isFindingVideos ? 'Finding...' : 'Watch Tutorials'}
+                        </button>
+                      </SimpleTooltip>
                     ) : (
                       <div className="col-span-1 sm:col-span-2 space-y-3 bg-zinc-50 dark:bg-zinc-900/30 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800/80">
                         <h4 className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
@@ -579,21 +679,23 @@ export default function DIYGenerator() {
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {videos.map((video, idx) => {
                               const embedUrl = getEmbedUrl(video.url);
-                              return embedUrl ? (
+                              return (
                                 <div key={idx} className="space-y-2">
-                                  <div className="aspect-video rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900">
-                                    <iframe 
-                                      src={embedUrl} 
-                                      title={video.title}
-                                      className="w-full h-full"
-                                      allowFullScreen
-                                    />
-                                  </div>
+                                  {embedUrl && (
+                                    <div className="aspect-video rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900">
+                                      <iframe 
+                                        src={embedUrl} 
+                                        title={video.title}
+                                        className="w-full h-full"
+                                        allowFullScreen
+                                      />
+                                    </div>
+                                  )}
                                   <a href={video.url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:text-indigo-600 dark:hover:text-indigo-400 line-clamp-2">
-                                    {video.title}
+                                    {video.title || video.url}
                                   </a>
                                 </div>
-                              ) : null;
+                              );
                             })}
                           </div>
                         ) : (
@@ -603,7 +705,7 @@ export default function DIYGenerator() {
                     )}
 
                     {/* Image Generation */}
-                    {!imageUrl ? (
+                    {!imageUrl && !isGeneratingImage && (
                       <div className="flex items-center gap-2">
                         <select 
                           value={imageSize} 
@@ -615,18 +717,34 @@ export default function DIYGenerator() {
                           <option value="2K">2K</option>
                           <option value="4K">4K</option>
                         </select>
-                        <button
-                          onClick={handleGenerateImage}
-                          disabled={isGeneratingImage}
-                          className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-zinc-100 dark:bg-zinc-800/50 text-zinc-700 dark:text-zinc-300 font-medium text-xs hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors disabled:opacity-50 border border-zinc-200 dark:border-zinc-700/50"
-                        >
-                          {isGeneratingImage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Image className="w-3.5 h-3.5" />}
-                          {isGeneratingImage ? 'Generating...' : 'Visualize'}
-                        </button>
+                        <SimpleTooltip content="Generate an image of the finished project">
+                          <button
+                            onClick={handleGenerateImage}
+                            className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-zinc-100 dark:bg-zinc-800/50 text-zinc-700 dark:text-zinc-300 font-medium text-xs hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors border border-zinc-200 dark:border-zinc-700/50"
+                          >
+                            <Image className="w-3.5 h-3.5" />
+                            Visualize
+                          </button>
+                        </SimpleTooltip>
                       </div>
-                    ) : (
-                      <div className="col-span-1 sm:col-span-2 mt-2 rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900">
+                    )}
+                    
+                    {isGeneratingImage && (
+                      <div className="col-span-1 sm:col-span-2 mt-2">
+                        <div className="aspect-square sm:aspect-video w-full rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900/50 flex flex-col items-center justify-center p-6 text-center animate-pulse relative overflow-hidden">
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 dark:via-white/5 to-transparent -translate-x-full animate-[shimmer_1.5s_infinite]" />
+                          <Loader2 className="w-6 h-6 text-indigo-500 animate-spin mb-3 relative z-10" />
+                          <p className="text-xs font-mono tracking-wider text-zinc-500 dark:text-zinc-400 relative z-10">Crafting Concept Image...</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {imageUrl && (
+                      <div className="col-span-1 sm:col-span-2 mt-2 rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900 relative group cursor-pointer" onClick={(e) => { e.stopPropagation(); window.open(imageUrl, '_blank'); }}>
                         <img src={imageUrl} alt={project.title} className="w-full h-auto object-cover" />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                           <span className="opacity-0 group-hover:opacity-100 bg-white/90 dark:bg-black/80 px-3 py-1.5 rounded-full text-[10px] font-mono tracking-widest text-zinc-900 dark:text-white transition-opacity border border-black/10 dark:border-white/10 shadow-sm backdrop-blur-sm">View Full Res</span>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -660,21 +778,25 @@ export default function DIYGenerator() {
             </div>
             <div className="flex items-center gap-1">
               {view === 'results' && (
-                <button 
-                  onClick={handlePrint}
-                  className="p-2 rounded-md hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50 transition-colors text-zinc-500 dark:text-zinc-400"
-                  title="Print Projects"
-                >
-                  <Printer className="w-4 h-4" />
-                </button>
+                <SimpleTooltip content="Print current projects">
+                  <button 
+                    onClick={handlePrint}
+                    className="p-2 rounded-md hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50 transition-colors text-zinc-500 dark:text-zinc-400"
+                    title="Print Projects"
+                  >
+                    <Printer className="w-4 h-4" />
+                  </button>
+                </SimpleTooltip>
               )}
-              <button 
-                onClick={toggleTheme}
-                className="p-2 rounded-md hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50 transition-colors text-zinc-500 dark:text-zinc-400"
-                aria-label="Toggle theme"
-              >
-                {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-              </button>
+              <SimpleTooltip content="Toggle theme mode">
+                <button 
+                  onClick={toggleTheme}
+                  className="p-2 rounded-md hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50 transition-colors text-zinc-500 dark:text-zinc-400"
+                  aria-label="Toggle theme"
+                >
+                  {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                </button>
+              </SimpleTooltip>
             </div>
           </div>
         </header>
@@ -702,30 +824,36 @@ export default function DIYGenerator() {
 
                 <Tabs.Root defaultValue="generate" className="w-full">
                   <Tabs.List className="flex w-full border-b border-zinc-200 dark:border-zinc-800 mb-8">
-                    <Tabs.Trigger 
-                      value="generate" 
-                      className="flex-1 pb-3 text-[13px] font-mono uppercase tracking-wider text-zinc-400 hover:text-zinc-900 dark:hover:text-white data-[state=active]:text-zinc-900 dark:data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-zinc-900 dark:data-[state=active]:border-white transition-all"
-                    >
-                      Generate
-                    </Tabs.Trigger>
-                    <Tabs.Trigger 
-                      value="saved" 
-                      className="flex-1 pb-3 text-[13px] font-mono uppercase tracking-wider text-zinc-400 hover:text-zinc-900 dark:hover:text-white data-[state=active]:text-zinc-900 dark:data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-zinc-900 dark:data-[state=active]:border-white transition-all flex items-center justify-center gap-2"
-                    >
-                      Saved
-                      {savedProjects.length > 0 && (
-                        <span className="bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 py-0.5 px-1.5 rounded text-[10px]">
-                          {savedProjects.length}
-                        </span>
-                      )}
-                    </Tabs.Trigger>
-                    <Tabs.Trigger 
-                      value="video" 
-                      className="flex-1 pb-3 text-[13px] font-mono uppercase tracking-wider text-zinc-400 hover:text-zinc-900 dark:hover:text-white data-[state=active]:text-zinc-900 dark:data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-zinc-900 dark:data-[state=active]:border-white transition-all flex items-center justify-center gap-2"
-                    >
-                      <Video className="w-3.5 h-3.5" />
-                      Analyze
-                    </Tabs.Trigger>
+                    <SimpleTooltip content="Generate new DIY projects">
+                      <Tabs.Trigger 
+                        value="generate" 
+                        className="flex-1 pb-3 text-[13px] font-mono uppercase tracking-wider text-zinc-400 hover:text-zinc-900 dark:hover:text-white data-[state=active]:text-zinc-900 dark:data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-zinc-900 dark:data-[state=active]:border-white transition-all"
+                      >
+                        Generate
+                      </Tabs.Trigger>
+                    </SimpleTooltip>
+                    <SimpleTooltip content="View your saved projects">
+                      <Tabs.Trigger 
+                        value="saved" 
+                        className="flex-1 pb-3 text-[13px] font-mono uppercase tracking-wider text-zinc-400 hover:text-zinc-900 dark:hover:text-white data-[state=active]:text-zinc-900 dark:data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-zinc-900 dark:data-[state=active]:border-white transition-all flex items-center justify-center gap-2"
+                      >
+                        Saved
+                        {savedProjects.length > 0 && (
+                          <span className="bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 py-0.5 px-1.5 rounded text-[10px]">
+                            {savedProjects.length}
+                          </span>
+                        )}
+                      </Tabs.Trigger>
+                    </SimpleTooltip>
+                    <SimpleTooltip content="Extract steps and materials from a video">
+                      <Tabs.Trigger 
+                        value="video" 
+                        className="flex-1 pb-3 text-[13px] font-mono uppercase tracking-wider text-zinc-400 hover:text-zinc-900 dark:hover:text-white data-[state=active]:text-zinc-900 dark:data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-zinc-900 dark:data-[state=active]:border-white transition-all flex items-center justify-center gap-2"
+                      >
+                        <Video className="w-3.5 h-3.5" />
+                        Analyze
+                      </Tabs.Trigger>
+                    </SimpleTooltip>
                   </Tabs.List>
 
                   <Tabs.Content value="generate" className="outline-none">
@@ -748,12 +876,14 @@ export default function DIYGenerator() {
                                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white dark:bg-zinc-800 text-xs font-medium text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 shadow-sm"
                               >
                                 {mat}
-                                <button 
-                                  onClick={() => removeMaterial(mat)}
-                                  className="text-zinc-400 hover:text-rose-500 transition-colors focus:outline-none"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
+                                <SimpleTooltip content="Remove material">
+                                  <button 
+                                    onClick={() => removeMaterial(mat)}
+                                    className="text-zinc-400 hover:text-rose-500 transition-colors focus:outline-none"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </SimpleTooltip>
                               </motion.span>
                             ))}
                           </AnimatePresence>
@@ -774,13 +904,13 @@ export default function DIYGenerator() {
                         <label className="text-[11px] font-mono uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
                           02. Category
                         </label>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="flex flex-wrap gap-3">
                           {categories.map((cat) => (
                             <button
                               key={cat.id}
                               onClick={() => setCategory(cat.id)}
                               className={`
-                                flex flex-col items-center justify-center gap-2 p-4 rounded-xl border transition-all duration-200
+                                flex-1 min-w-[110px] flex flex-col items-center justify-center gap-2 p-4 rounded-xl border transition-all duration-200
                                 ${category === cat.id 
                                   ? 'border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900 shadow-md' 
                                   : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0f0f0f] text-zinc-500 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700'}
@@ -790,6 +920,39 @@ export default function DIYGenerator() {
                               <span className="text-[11px] font-mono uppercase tracking-wider">{cat.label}</span>
                             </button>
                           ))}
+                          
+                          {/* AI Suggestion Button */}
+                          {(suggestedCategory || isSuggestingCategory) && (
+                            <button
+                              onClick={() => suggestedCategory && setCategory(suggestedCategory as Category)}
+                              disabled={isSuggestingCategory}
+                              className={`
+                                flex-1 min-w-[140px] flex flex-col items-center justify-center p-4 rounded-xl border transition-all duration-200
+                                ${category === suggestedCategory 
+                                  ? 'border-indigo-600 bg-indigo-600 text-white shadow-md' 
+                                  : 'border-indigo-200 dark:border-indigo-800/50 bg-indigo-50/50 dark:bg-indigo-900/10 text-indigo-600 dark:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-700/50'}
+                              `}
+                            >
+                              {isSuggestingCategory ? (
+                                <div className="flex flex-col items-center gap-2 animate-pulse w-full">
+                                  <div className="flex items-center gap-2">
+                                    <Loader2 className="w-4 h-4 animate-spin opacity-70" />
+                                    <span className="text-[11px] font-mono uppercase tracking-wider text-center leading-tight">
+                                      Thinking...
+                                    </span>
+                                  </div>
+                                  <div className="h-1.5 w-16 bg-indigo-200 dark:bg-indigo-800/80 rounded-full mt-1"></div>
+                                </div>
+                              ) : (
+                                <div className="flex flex-col items-center justify-center gap-2">
+                                  <Sparkles className="w-4 h-4" />
+                                  <span className="text-[11px] font-mono uppercase tracking-wider text-center leading-tight">
+                                    {suggestedCategory}
+                                  </span>
+                                </div>
+                              )}
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -988,9 +1151,49 @@ export default function DIYGenerator() {
                 </div>
 
                 <div className="grid grid-cols-1 gap-6">
-                  {projects.map((project, idx) => (
-                    <ProjectCard key={project.id} project={project} />
-                  ))}
+                  {isGenerating ? (
+                    Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0f0f0f] overflow-hidden shadow-sm animate-pulse">
+                        <div className="p-6">
+                          <div className="flex justify-between items-start gap-4 mb-6">
+                            <div className="space-y-3 flex-1">
+                              <div className="flex items-center gap-2">
+                                <div className="h-5 w-24 bg-zinc-200 dark:bg-zinc-800 rounded-md"></div>
+                                <div className="h-5 w-20 bg-zinc-200 dark:bg-zinc-800 rounded-md"></div>
+                              </div>
+                              <div className="h-6 w-3/4 bg-zinc-200 dark:bg-zinc-800 rounded-md"></div>
+                              <div className="h-4 w-full bg-zinc-200 dark:bg-zinc-800 rounded-md"></div>
+                              <div className="h-4 w-5/6 bg-zinc-200 dark:bg-zinc-800 rounded-md"></div>
+                            </div>
+                            <div className="w-10 h-10 bg-zinc-200 dark:bg-zinc-800 rounded-full shrink-0"></div>
+                          </div>
+                          
+                          <div className="bg-zinc-50 dark:bg-zinc-900/50 rounded-xl p-4 mb-4 space-y-3 border border-zinc-100 dark:border-zinc-800/80">
+                            <div className="h-4 w-32 bg-zinc-200 dark:bg-zinc-800 rounded-md"></div>
+                            <div className="flex flex-wrap gap-2">
+                               <div className="h-7 w-20 bg-zinc-200 dark:bg-zinc-800 rounded-md"></div>
+                               <div className="h-7 w-24 bg-zinc-200 dark:bg-zinc-800 rounded-md"></div>
+                               <div className="h-7 w-16 bg-zinc-200 dark:bg-zinc-800 rounded-md"></div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex justify-center mt-6 pt-4 border-t border-zinc-100 dark:border-zinc-800/50">
+                            <div className="h-4 w-28 bg-zinc-200 dark:bg-zinc-800 rounded-md"></div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    projects.map((project, idx) => (
+                      <ProjectCard key={project.id} project={project} />
+                    ))
+                  )}
+                  
+                  {!isGenerating && projects.length === 0 && (
+                     <div className="text-center py-12 text-zinc-500 dark:text-zinc-400 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl">
+                       No projects found.
+                     </div>
+                  )}
                 </div>
               </motion.div>
             )}

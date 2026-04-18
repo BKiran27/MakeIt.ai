@@ -1,2 +1,20 @@
-The Value
-Unlike static blogs, this is a highly personalized, all-in-one platform. It adapts to the user's specific needs and keeps them engaged from their first spark of inspiration all the way to the finished project.
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+</div>
+
+# Run and deploy your AI Studio app
+
+This contains everything you need to run your app locally.
+
+View your app in AI Studio: https://ai.studio/apps/21836ccd-a995-4a14-8768-1ddda070c129
+
+## Run Locally
+
+**Prerequisites:**  Node.js
+
+
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`
