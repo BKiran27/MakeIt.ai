@@ -121,8 +121,8 @@ export default function DIYGenerator() {
         const ai = new GoogleGenAI({ apiKey });
         const response = await ai.models.generateContent({
           model: 'gemini-3.1-flash-lite-preview',
-          contents: `Based on a user having these materials for a DIY project: ${materials.join(', ')}. Suggest ONE highly relevant, specific DIY project category (e.g., Woodworking, Upcycled Fashion, Electronics, Pallet Furniture). Respond with ONLY the category name, max 3 words. Do not use quotes or markdown.`,
-          config: { temperature: 0.3 }
+          contents: `Analyze these materials: ${materials.join(', ')}. Suggest ONE highly relevant, niche, and creative DIY project category that perfectly fits these materials (e.g., "Vintage Electronics Upcycling", "Rustic Wood Sculpting", "Micro-botics", "Eco-Resin Casting"). Avoid overly generic terms like "Crafts" or "Home Improvement". Respond with ONLY the category name, max 4 words. Do not use quotes or markdown.`,
+          config: { temperature: 0.7 }
         });
         const text = response.text?.trim().replace(/['"]/g, '') || null;
         if (text && text.length > 0 && text.length < 30) {
@@ -181,15 +181,16 @@ export default function DIYGenerator() {
       const ai = new GoogleGenAI({ apiKey });
       
       const prompt = `I have the following materials available: ${materials.join(', ')}. 
-      Generate 3 creative DIY projects. 
-      You MUST assign a clear category to each project from this list: "Home Improvement", "Crafts", "Gardening", "Electronics", "Upcycling", or create a highly relevant one.
-      Current preferred category: "${category}".
+      Generate 3 highly creative and context-aware DIY projects.
+      You MUST assign a highly specific, niche, and creative category to each project that directly relates to the materials and techniques used (e.g., "Acoustic Art", "Wearable Cyberpunk", "Terrarium Sculpting"). Do NOT use generic categories like "Crafts" or "Home Improvement" unless absolutely necessary.
+      Current preferred category hint: "${category}".
       Ensure the projects are practical, safe, and primarily use the provided materials, though basic household items (like glue, scissors, nails) can be assumed.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-3.1-pro-preview',
         contents: prompt,
         config: {
+          thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
           responseMimeType: 'application/json',
           responseSchema: {
             type: Type.ARRAY,
@@ -327,15 +328,25 @@ export default function DIYGenerator() {
         const ai = new GoogleGenAI({ apiKey });
         const response = await ai.models.generateContent({
           model: 'gemini-3-flash-preview',
-          contents: `Find 2 YouTube tutorial videos for the DIY project: "${project.title}". Return ONLY a JSON array of objects with 'title' and 'url'. The 'url' must be the full YouTube watch URL. Do not include any markdown formatting like \`\`\`json.`,
+          contents: `Return 2 relevant YouTube tutorial videos for the DIY project: "${project.title}". If you cannot find any, generate likely queries as titles and use a generic search URL placeholder.`,
           config: {
-            tools: [{ googleSearch: {} }]
+            tools: [{ googleSearch: {} }],
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  title: { type: Type.STRING },
+                  url: { type: Type.STRING, description: "Full YouTube watch URL" }
+                },
+                required: ["title", "url"]
+              }
+            }
           }
         });
         
-        let text = response.text || "[]";
-        text = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        const parsedVideos = JSON.parse(text);
+        const parsedVideos = JSON.parse(response.text || "[]");
         setVideos(parsedVideos);
       } catch (err) {
         console.error(err);
@@ -431,9 +442,10 @@ export default function DIYGenerator() {
         
         const ai = new GoogleGenAI({ apiKey });
         const response = await ai.models.generateContent({
-          model: 'gemini-3-flash-preview',
-          contents: `Find additional tips, variations, or material sourcing information related to the DIY project: "${project.title}".`,
+          model: 'gemini-3.1-pro-preview',
+          contents: `Use Google Search to find highly specific, actionable web tips, variations, or material sourcing options specifically for the DIY project: "${project.title}". Describe the findings accurately.`,
           config: {
+            thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
             tools: [{ googleSearch: {} }]
           }
         });
@@ -1061,7 +1073,7 @@ export default function DIYGenerator() {
                                           mimeType: file.type
                                         }
                                       },
-                                      "Analyze this DIY video. Extract the project title, a short description, estimated difficulty (Easy, Medium, Hard), estimated time, a list of materials needed, step-by-step instructions, and assign a category (Home Improvement, Crafts, Gardening, Electronics, Upcycling, or other). Format the output as a JSON array containing a single object with these exact keys: title, description, difficulty, estimatedTime, materialsNeeded (array of strings), instructions (array of strings), category."
+                                      "Analyze this DIY video. Extract the project title, a short description, estimated difficulty (Easy, Medium, Hard), estimated time, a list of materials needed, step-by-step instructions. Assign a highly specific, niche, and creative category that perfectly describes the project (e.g., 'Eco-Resin Casting' or 'Micro-botics' instead of just 'Crafts'). Format the output as a JSON array containing a single object with these exact keys: title, description, difficulty, estimatedTime, materialsNeeded (array of strings), instructions (array of strings), category."
                                     ],
                                     config: {
                                       responseMimeType: 'application/json',
