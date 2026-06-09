@@ -1,5 +1,5 @@
 import type {Metadata} from 'next';
-import { Inter, Outfit, JetBrains_Mono } from 'next/font/google';
+import { Inter, Poppins, JetBrains_Mono } from 'next/font/google';
 import './globals.css'; // Global styles
 
 const inter = Inter({
@@ -7,8 +7,9 @@ const inter = Inter({
   variable: '--font-sans',
 });
 
-const outfit = Outfit({
+const poppins = Poppins({
   subsets: ['latin'],
+  weight: ['400', '500', '600', '700', '800'],
   variable: '--font-display',
 });
 
@@ -24,8 +25,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
-    <html lang="en" className={`${inter.variable} ${outfit.variable} ${jetbrainsMono.variable}`}>
-      <body className="font-sans antialiased bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50" suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} ${poppins.variable} ${jetbrainsMono.variable}`}>
+      <body className="font-sans antialiased bg-[#0F172A] text-slate-50" suppressHydrationWarning>
         {children}
       </body>
     </html>

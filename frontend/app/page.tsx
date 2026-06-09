@@ -1,260 +1,39 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { useRouter } from 'next/navigation';
 import { 
-  Plus, X, Hammer, Scissors, Leaf, Sparkles, 
-  Moon, Sun, ArrowLeft, Clock, Wrench, Loader2,
-  AlertCircle, Bookmark, BookmarkCheck, Share2, Heart, Send, LogIn, LogOut, CheckCircle2
+  Sparkles, Camera, Heart, CheckCircle2, MessageSquare, 
+  ArrowRight, Play, Wrench, ShieldCheck, HelpCircle, 
+  Tv, Bookmark, FileText, ChevronDown 
 } from 'lucide-react';
-import * as Tabs from '@radix-ui/react-tabs';
-import * as Toast from '@radix-ui/react-toast';
-import * as Tooltip from '@radix-ui/react-tooltip';
-import { supabase } from '../lib/supabase';
+import { useDiyStore } from '../lib/store';
+import Navbar from '../components/layout/Navbar';
+import AuthDialog from '../components/ui/AuthDialog';
+import CustomToast from '../components/ui/CustomToast';
 
-// API Configuration pointing to NestJS API Gateway
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+export default function LandingPage() {
+  const router = useRouter();
+  const { session, setAuthOpen, setSession, syncUser, showToast } = useDiyStore();
+  const [activeFaq, setActiveFaq] = useState<number | null>(null);
 
-interface Project {
-  id: string;
-  title: string;
-  description: string;
-  difficulty: 'EASY' | 'MEDIUM' | 'HARD';
-  timeEstimate: string;
-  costEstimate: string;
-  imageUrl?: string;
-  category?: string;
-  authorId?: string;
-  steps?: { stepNumber: number; instruction: string; safetyWarning?: string }[];
-  likes?: { userId: string }[];
-  comments?: CommentType[];
-  author?: { name: string; avatarUrl?: string };
-  materials?: any[];
-  tools?: any[];
-}
-
-interface CommentType {
-  id: string;
-  content: string;
-  createdAt: string;
-  user: { name: string; avatarUrl?: string };
-}
-
-const SimpleTooltip = ({ children, content, side = "top" }: { children: React.ReactNode, content: React.ReactNode, side?: "top" | "right" | "bottom" | "left" }) => (
-  <Tooltip.Provider delayDuration={200}>
-    <Tooltip.Root>
-      <Tooltip.Trigger asChild>
-        {children}
-      </Tooltip.Trigger>
-      <Tooltip.Portal>
-        <Tooltip.Content 
-          side={side} 
-          sideOffset={5} 
-          className="z-[100] px-2.5 py-1.5 bg-zinc-900 dark:bg-zinc-100 text-zinc-50 dark:text-zinc-900 text-[11px] font-medium tracking-wide rounded-md shadow-md"
-        >
-          {content}
-          <Tooltip.Arrow className="fill-zinc-900 dark:fill-zinc-100" />
-        </Tooltip.Content>
-      </Tooltip.Portal>
-    </Tooltip.Root>
-  </Tooltip.Provider>
-);
-
-export default function DIYGenerator() {
-  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
-  const [view, setView] = useState<'input' | 'results'>('input');
-  const [activeTab, setActiveTab] = useState('generate');
-  
-  // Auth state
-  const [session, setSession] = useState<any>(null);
-  const [authEmail, setAuthEmail] = useState('');
-  const [authPassword, setAuthPassword] = useState('');
-  const [authName, setAuthName] = useState('');
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [authLoading, setAuthLoading] = useState(false);
-  const [dbUser, setDbUser] = useState<any>(null);
-
-  // App States
-  const [materials, setMaterials] = useState<string[]>([]);
-  const [inputValue, setInputValue] = useState('');
-  const [category, setCategory] = useState('Surprise Me');
-  const [difficulty, setDifficulty] = useState<'EASY' | 'MEDIUM' | 'HARD'>('EASY');
-  
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
-  const [projects, setProjects] = useState<any[]>([]);
-  const [savedProjects, setSavedProjects] = useState<Project[]>([]);
-  const [communityProjects, setCommunityProjects] = useState<Project[]>([]);
-  const [error, setError] = useState<string | null>(null);
-
-  // Search filter
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // Toast state
-  const [toastOpen, setToastOpen] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-
-  // Setup Auth state listener & LocalStorage loaders
+  // Auto navigate to generate workspace if session is loaded
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) syncUser(session);
-    });
+    if (session) {
+      router.push('/generate');
+    }
+  }, [session, router]);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) {
-        syncUser(session);
-      } else {
-        setDbUser(null);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // Sync user with NestJS backend database
-  const syncUser = async (currentSession: any) => {
-    const nameFromMeta = currentSession.user?.user_metadata?.name || '';
-    try {
-      const response = await fetch(`${API_URL}/auth/sync`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${currentSession.access_token}`,
-        },
-        body: JSON.stringify({ name: nameFromMeta || currentSession.user?.email?.split('@')[0] }),
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setDbUser(data);
-      } else {
-        throw new Error();
-      }
-    } catch (err) {
-      console.error('Failed to sync user with backend, using offline fallback:', err);
-      setDbUser({
-        id: currentSession.user?.id || 'mock-user-id',
-        email: currentSession.user?.email || 'maker@diygenius.ai',
-        name: nameFromMeta || currentSession.user?.email?.split('@')[0] || 'DIY Master',
-        isPremium: true
-      });
+  const handleStartCreating = () => {
+    if (session) {
+      router.push('/generate');
+    } else {
+      setAuthOpen(true);
     }
   };
 
-  // Fetch saved bookmarks from NestJS backend
-  const fetchSavedProjects = async () => {
-    if (!session) return;
-    try {
-      const response = await fetch(`${API_URL}/projects/saved`, {
-        headers: { 'Authorization': `Bearer ${session.access_token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setSavedProjects(data.projects || []);
-      } else {
-        throw new Error();
-      }
-    } catch (e) {
-      console.error('Failed to fetch saved projects, using local storage fallback:', e);
-      const localSaves = localStorage.getItem('diy_saved_projects');
-      setSavedProjects(localSaves ? JSON.parse(localSaves) : []);
-    }
-  };
-
-  // Fetch community projects from NestJS backend
-  const fetchCommunityProjects = async (queryParam = '') => {
-    try {
-      const url = queryParam 
-        ? `${API_URL}/projects?query=${encodeURIComponent(queryParam)}` 
-        : `${API_URL}/projects`;
-      const response = await fetch(url);
-      if (response.ok) {
-        const data = await response.json();
-        setCommunityProjects(data.projects || []);
-      } else {
-        throw new Error();
-      }
-    } catch (e) {
-      console.error('Failed to fetch community projects, loading mock projects:', e);
-      const mockCommunity = [
-        {
-          id: 'mock-proj-1',
-          title: 'Eco-Friendly Self-Watering Planter',
-          description: 'A brilliant self-watering planter made by upcycling plastic bottles. Perfect for small indoor herbs and flowers.',
-          difficulty: 'EASY' as const,
-          timeEstimate: '30 mins',
-          costEstimate: '$0',
-          category: 'Gardening',
-          imageUrl: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?q=80&w=600&auto=format&fit=crop',
-          author: { name: 'EcoGardener' }
-        },
-        {
-          id: 'mock-proj-2',
-          title: 'Geometric Desk Organizer',
-          description: 'A stylish and modern desk organizer built entirely out of sturdy cardboard pieces. Perfect for storing pens, rulers, and craft tools.',
-          difficulty: 'EASY' as const,
-          timeEstimate: '1.5 hours',
-          costEstimate: '$0 - $5',
-          category: 'Crafts',
-          author: { name: 'CraftyMaker' }
-        }
-      ];
-      setCommunityProjects(mockCommunity);
-    }
-  };
-
-  useEffect(() => {
-    if (activeTab === 'saved') {
-      fetchSavedProjects();
-    } else if (activeTab === 'community') {
-      fetchCommunityProjects(searchQuery);
-    }
-  }, [activeTab, searchQuery, session]);
-
-  // Handle Authentication via Supabase
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!authEmail || !authPassword) return;
-    setAuthLoading(true);
-    setError(null);
-
-    try {
-      if (isSignUp) {
-        const { data, error } = await supabase.auth.signUp({
-          email: authEmail,
-          password: authPassword,
-          options: { data: { name: authName } }
-        });
-        if (error) throw error;
-        showToast('Signed up successfully! Verify email if required.');
-      } else {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: authEmail,
-          password: authPassword,
-        });
-        if (error) throw error;
-        showToast('Signed in successfully.');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Authentication failed');
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const handleSignOut = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (e) {
-      console.log('Supabase sign out bypassed or failed');
-    }
-    setSession(null);
-    setDbUser(null);
-    showToast('Signed out successfully.');
-  };
-
-  const handleGuestLogin = () => {
+  const handleWatchDemo = () => {
+    // Guest bypass mode
     const mockSession = {
       access_token: 'mock-token-guest',
       user: {
@@ -265,1195 +44,346 @@ export default function DIYGenerator() {
     };
     setSession(mockSession);
     syncUser(mockSession);
-    showToast('Logged in as Demo Guest.');
+    showToast('Logged in as guest demo.');
+    router.push('/generate');
   };
 
-  // Handle Image Scanner Upload (calls backend detect endpoint)
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !session) {
-      if (!session) setError('Please sign in to scan materials using AI.');
-      return;
+  const features = [
+    {
+      icon: <Camera className="w-5 h-5 text-[#00D4FF]" />,
+      title: 'Material Scanner',
+      desc: 'Snap a picture of your recycling box or crafting desk. AI automatically identifies usable items.'
+    },
+    {
+      icon: <Sparkles className="w-5 h-5 text-[#6C63FF]" />,
+      title: 'Custom Blueprint AI',
+      desc: 'Specify your available tools and target difficulty. AI designs detailed structural steps customized for you.'
+    },
+    {
+      icon: <FileText className="w-5 h-5 text-amber-500" />,
+      title: 'Printable Formats',
+      desc: 'Download clean, high-contrast, double-column PDF cards designed to carry straight into your workshop.'
+    },
+    {
+      icon: <Tv className="w-5 h-5 text-emerald-400" />,
+      title: 'Illustrated Blueprints',
+      desc: 'Unlock active cover visuals and step-by-step schematics generated dynamically by DALL-E.'
     }
-    
-    setIsScanning(true);
-    setError(null);
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-      const response = await fetch(`${API_URL}/materials/detect`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: formData
-      });
-
-      if (!response.ok) throw new Error('Failed to parse materials from image');
-      const data = await response.json();
-      
-      const newMaterials = data.materials || [];
-      if (newMaterials.length > 0) {
-        const combined = Array.from(new Set([...materials, ...newMaterials]));
-        setMaterials(combined);
-        showToast(`Detected ${newMaterials.length} materials!`);
-      } else {
-        setError('No materials detected. Try again with a clearer picture.');
-      }
-    } catch (err: any) {
-      console.warn('Backend materials scan failed, using simulated scanning:', err);
-      const dummyMaterials = ['cardboard box', 'plastic bottle', 'glue', 'scissors', 'acrylic paint'];
-      const combined = Array.from(new Set([...materials, ...dummyMaterials]));
-      setMaterials(combined);
-      showToast('Simulated Offline Scan: Detected materials!');
-    } finally {
-      setIsScanning(false);
-    }
-  };
-
-  useEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [theme]);
-
-  const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
-
-  const showToast = (message: string) => {
-    setToastMessage(message);
-    setToastOpen(false);
-    setTimeout(() => setToastOpen(true), 100);
-  };
-
-  const handleAddMaterial = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && inputValue.trim()) {
-      e.preventDefault();
-      const newMat = inputValue.trim().toLowerCase();
-      if (!materials.includes(newMat)) {
-        setMaterials([...materials, newMat]);
-      }
-      setInputValue('');
-      setError(null);
-    }
-  };
-
-  const removeMaterial = (mat: string) => {
-    setMaterials(materials.filter(m => m !== mat));
-  };
-
-  // Generate Projects via Backend
-  const handleGenerate = async () => {
-    if (materials.length === 0) {
-      setError("Please add at least one material to get started.");
-      return;
-    }
-    if (!session) {
-      setError("Please sign in to generate DIY projects.");
-      return;
-    }
-    
-    setError(null);
-    setIsGenerating(true);
-    setProjects([]);
-    setView('results');
-
-    try {
-      const response = await fetch(`${API_URL}/projects/generate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({
-          materials,
-          difficulty,
-          category
-        })
-      });
-
-      if (!response.ok) throw new Error('Server error generating projects');
-      const data = await response.json();
-      setProjects(data.projects || []);
-    } catch (err: any) {
-      console.warn('Backend generate failed, using offline mock projects:', err);
-      const mockProjects = [
-        {
-          id: 'mock-proj-1',
-          title: 'Eco-Friendly Self-Watering Planter',
-          description: 'A brilliant self-watering planter made by upcycling plastic bottles. Perfect for small indoor herbs and flowers.',
-          difficulty: difficulty || 'EASY',
-          timeEstimate: '30 mins',
-          costEstimate: '$0',
-          materialsNeeded: materials.slice(0, 3),
-          category: category || 'Gardening',
-        },
-        {
-          id: 'mock-proj-2',
-          title: 'Geometric Desk Organizer',
-          description: 'A stylish and modern desk organizer built entirely out of sturdy cardboard pieces. Perfect for storing pens, rulers, and craft tools.',
-          difficulty: difficulty || 'EASY',
-          timeEstimate: '1.5 hours',
-          costEstimate: '$0 - $5',
-          materialsNeeded: materials,
-          category: category || 'Crafts',
-        },
-        {
-          id: 'mock-proj-3',
-          title: 'Artistic Storage Caddy',
-          description: 'An elegant carrying caddy constructed from thick cardboard, detailed with acrylic paint, and divided using bottle parts.',
-          difficulty: difficulty || 'MEDIUM',
-          timeEstimate: '2 hours',
-          costEstimate: '$5 - $10',
-          materialsNeeded: materials,
-          category: category || 'Crafts',
-        }
-      ];
-      setProjects(mockProjects);
-      showToast('Simulated Offline blueprints generated.');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  // Stripe subscription Checkout
-  const handleUpgrade = async () => {
-    if (!session) return;
-    try {
-      const response = await fetch(`${API_URL}/billing/checkout`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.url) {
-          window.location.href = data.url;
-        }
-      } else {
-        showToast('Billing service unavailable right now.');
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const categories = [
-    { id: 'Home Improvement', icon: <Hammer className="w-4 h-4" />, label: 'Home' },
-    { id: 'Crafts', icon: <Scissors className="w-4 h-4" />, label: 'Crafts' },
-    { id: 'Gardening', icon: <Leaf className="w-4 h-4" />, label: 'Garden' },
-    { id: 'Surprise Me', icon: <Sparkles className="w-4 h-4" />, label: 'Surprise' },
   ];
 
-  const getDifficultyColor = (diff: string) => {
-    switch (diff.toLowerCase()) {
-      case 'easy': return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20';
-      case 'medium': return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20';
-      case 'hard': return 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20';
-      default: return 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/20';
+  const faqs = [
+    {
+      q: "What kinds of materials are supported?",
+      a: "Anything! You can scan cardboards, plastic bottles, strings, wood scraps, old metal cans, electronic wires, fabrics, and more. If the scanner misses an item, you can type it in manually in seconds."
+    },
+    {
+      q: "Are the safety guidelines reliable?",
+      a: "Yes. Safety precautions are integrated directly into our AI generation system. It highlights hazards such as sharp blade cutter angles, glue gun heat thresholds, and recommends mask safety when dealing with volatile chemicals or fumes."
+    },
+    {
+      q: "Can I use it completely offline?",
+      a: "Our app is built with a dual-mode local fallback. You can access and checklist all your bookmarked instructions offline! Only generating new blueprints requires active AI connections."
+    },
+    {
+      q: "How does the Stripe subscription billing work?",
+      a: "Standard accounts get 5 material scans per day. Genius Premium ($9.99/mo) unlocks unlimited custom generations, printable blueprints, and DALL-E illustrations."
     }
-  };
-
-  // Nested Project Card Component (to call backend /generate/steps on expand)
-  const ProjectCard = ({ project, isSavedView = false }: { project: any, isSavedView?: boolean }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
-    const [fullProject, setFullProject] = useState<Project | null>(project.steps ? project : null);
-    const [isLoadingDetails, setIsLoadingDetails] = useState(false);
-    const [isSaved, setIsSaved] = useState(savedProjects.some(p => p.id === project.id));
-    const [isLiked, setIsLiked] = useState(project.likes?.some((l: any) => l.userId === session?.user?.id));
-    const [likeCount, setLikeCount] = useState(project.likes?.length || 0);
-
-    // Cover Visual state
-    const [imageUrl, setImageUrl] = useState<string | null>(project.imageUrl || null);
-    const [isVisualizing, setIsVisualizing] = useState(false);
-
-    // Comments states
-    const [comments, setComments] = useState<CommentType[]>(project.comments || []);
-    const [commentText, setCommentText] = useState('');
-
-    useEffect(() => {
-      setIsSaved(savedProjects.some(p => p.id === project.id));
-    }, [savedProjects, project.id]);
-
-    const handleCardClick = async () => {
-      setIsExpanded(!isExpanded);
-      if (fullProject || isLoadingDetails) return;
-
-      setIsLoadingDetails(true);
-      try {
-        const response = await fetch(`${API_URL}/projects/generate/steps`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          body: JSON.stringify({
-            title: project.title,
-            description: project.description,
-            difficulty: project.difficulty || 'Easy',
-            category: project.category || 'Surprise Me',
-            materials: project.materialsNeeded || materials
-          })
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setFullProject(data);
-          fetchSavedProjects();
-        } else {
-          throw new Error();
-        }
-      } catch (err) {
-        console.warn('Failed to load steps via backend, using offline fallback:', err);
-        const mockSteps = {
-          id: project.id || 'mock-id',
-          title: project.title,
-          description: project.description,
-          difficulty: project.difficulty || 'EASY',
-          timeEstimate: project.timeEstimate || '1.5 hours',
-          costEstimate: project.costEstimate || '$0',
-          category: project.category || 'Crafts',
-          materials: (project.materialsNeeded || materials).map((m: string) => ({ material: { name: m } })),
-          tools: [{ tool: { name: 'scissors' } }, { tool: { name: 'hot glue gun' } }],
-          steps: [
-            {
-              stepNumber: 1,
-              instruction: `Collect all required materials: ${(project.materialsNeeded || materials).join(', ')}. Ensure surfaces are clean.`,
-              safetyWarning: 'Use scissors carefully to avoid cuts.'
-            },
-            {
-              stepNumber: 2,
-              instruction: 'Measure and cut the shapes to size according to your project blueprints.',
-              safetyWarning: 'Cut away from your body at all times.'
-            },
-            {
-              stepNumber: 3,
-              instruction: 'Apply glue to join the cut pieces, holding firmly for 10-15 seconds.',
-              safetyWarning: 'Adult supervision required if using a hot glue gun.'
-            },
-            {
-              stepNumber: 4,
-              instruction: 'Add any decorative paint, let it dry for 30 minutes, and enjoy your completed project!'
-            }
-          ]
-        };
-        setFullProject(mockSteps as any);
-        showToast('Offline Mode: Loaded instructions blueprint.');
-      } finally {
-        setIsLoadingDetails(false);
-      }
-    };
-
-    const handleSave = async (e: React.MouseEvent) => {
-      e.stopPropagation();
-      if (!session) return;
-      
-      const targetId = fullProject?.id || project.id;
-      try {
-        const response = await fetch(`${API_URL}/projects/${targetId}/save`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${session.access_token}` }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setIsSaved(data.saved);
-          fetchSavedProjects();
-          showToast(data.saved ? 'Project bookmarked!' : 'Bookmark removed.');
-        } else {
-          throw new Error();
-        }
-      } catch (e) {
-        console.warn('Backend save failed, using local storage fallback:', e);
-        const currentSaved = [...savedProjects];
-        const targetProj = fullProject || project;
-        const exists = currentSaved.some(p => p.id === targetProj.id);
-        let updated;
-        if (exists) {
-          updated = currentSaved.filter(p => p.id !== targetProj.id);
-          setIsSaved(false);
-          showToast('Bookmark removed.');
-        } else {
-          updated = [...currentSaved, targetProj];
-          setIsSaved(true);
-          showToast('Project bookmarked!');
-        }
-        setSavedProjects(updated);
-        localStorage.setItem('diy_saved_projects', JSON.stringify(updated));
-      }
-    };
-
-    const handleLike = async (e: React.MouseEvent) => {
-      e.stopPropagation();
-      if (!session) return;
-
-      const targetId = fullProject?.id || project.id;
-      try {
-        const response = await fetch(`${API_URL}/projects/${targetId}/like`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${session.access_token}` }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setIsLiked(data.liked);
-          setLikeCount((prev: number) => data.liked ? prev + 1 : Math.max(0, prev - 1));
-          showToast(data.liked ? 'Liked project!' : 'Unliked project.');
-        } else {
-          throw new Error();
-        }
-      } catch (e) {
-        console.warn('Backend like failed, using local fallback:', e);
-        const nextLikedStatus = !isLiked;
-        setIsLiked(nextLikedStatus);
-        setLikeCount((prev: number) => nextLikedStatus ? prev + 1 : Math.max(0, prev - 1));
-        showToast(nextLikedStatus ? 'Liked project!' : 'Unliked project.');
-      }
-    };
-
-    const handleVisualize = async (e: React.MouseEvent) => {
-      e.stopPropagation();
-      if (!session) return;
-
-      const targetId = fullProject?.id || project.id;
-      setIsVisualizing(true);
-      try {
-        const response = await fetch(`${API_URL}/projects/${targetId}/visualize`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${session.access_token}` }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setImageUrl(data.imageUrl);
-          showToast('Image generated successfully!');
-        } else {
-          throw new Error();
-        }
-      } catch (e) {
-        console.warn('Backend visualize failed, using offline fallback image:', e);
-        setImageUrl('https://images.unsplash.com/photo-1513519245088-0e12902e5a38?q=80&w=600&auto=format&fit=crop');
-        showToast('Offline Mode: Generated mock visual cover.');
-      } finally {
-        setIsVisualizing(false);
-      }
-    };
-
-    const handlePostComment = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!commentText.trim() || !session) return;
-
-      const targetId = fullProject?.id || project.id;
-      try {
-        const response = await fetch(`${API_URL}/projects/${targetId}/comments`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          body: JSON.stringify({ content: commentText })
-        });
-        if (response.ok) {
-          const newComment = await response.json();
-          setComments([newComment, ...comments]);
-          setCommentText('');
-          showToast('Comment posted!');
-        } else {
-          throw new Error();
-        }
-      } catch (e) {
-        console.warn('Backend comment failed, posting comment locally:', e);
-        const mockNewComment: CommentType = {
-          id: Math.random().toString(36).substring(7),
-          content: commentText,
-          createdAt: new Date().toISOString(),
-          user: { name: session.user?.user_metadata?.name || 'DIY Master' }
-        };
-        setComments([mockNewComment, ...comments]);
-        setCommentText('');
-        showToast('Comment posted!');
-      }
-    };
-
-    const handleShare = async (e: React.MouseEvent) => {
-      e.stopPropagation();
-      const text = `Check out this DIY Project: ${project.title}\n\nDifficulty: ${project.difficulty}\n\nCreated using DIY Genius AI!`;
-      if (navigator.share) {
-        try {
-          await navigator.share({ title: project.title, text });
-        } catch (err) {
-          console.error(err);
-        }
-      } else {
-        navigator.clipboard.writeText(text);
-        showToast('Link copied to clipboard!');
-      }
-    };
-
-    return (
-      <motion.div 
-        layout
-        onClick={handleCardClick}
-        className="group flex flex-col bg-white dark:bg-[#0a0a0c] rounded-2xl border border-zinc-200 dark:border-zinc-800/80 overflow-hidden cursor-pointer hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-300 shadow-sm hover:shadow-md"
-      >
-        <div className="p-5 sm:p-6 bg-zinc-50/50 dark:bg-[#0f0f12] border-b border-zinc-100 dark:border-zinc-800/50">
-          <div className="flex items-start justify-between gap-4 mb-3">
-            <h3 className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 leading-snug">
-              {project.title}
-            </h3>
-            <div className="flex items-center gap-1 shrink-0 print:hidden" onClick={e => e.stopPropagation()}>
-              <SimpleTooltip content="Share Project">
-                <button 
-                  onClick={handleShare}
-                  className="p-1.5 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 rounded-md transition-colors"
-                >
-                  <Share2 className="w-4 h-4" />
-                </button>
-              </SimpleTooltip>
-              {session && (
-                <>
-                  <SimpleTooltip content={isLiked ? "Unlike" : "Like"}>
-                    <button 
-                      onClick={handleLike}
-                      className={`p-1.5 rounded-md transition-colors flex items-center gap-1 text-xs ${isLiked ? 'text-rose-500' : 'text-zinc-400 hover:text-rose-600'}`}
-                    >
-                      <Heart className="w-4 h-4" fill={isLiked ? "currentColor" : "none"} />
-                      <span>{likeCount}</span>
-                    </button>
-                  </SimpleTooltip>
-                  <SimpleTooltip content={isSaved ? "Remove bookmark" : "Save project"}>
-                    <button 
-                      onClick={handleSave}
-                      className={`p-1.5 rounded-md transition-colors ${isSaved ? 'text-indigo-500' : 'text-zinc-400 hover:text-indigo-400'}`}
-                    >
-                      {isSaved ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
-                    </button>
-                  </SimpleTooltip>
-                </>
-              )}
-            </div>
-          </div>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
-            {project.description}
-          </p>
-
-          <div className="flex flex-wrap items-center gap-2 mt-4 pt-2">
-            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider border ${getDifficultyColor(project.difficulty || 'Easy')}`}>
-              {project.difficulty || 'Easy'}
-            </span>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400 text-[10px] font-mono uppercase tracking-wider border border-zinc-200 dark:border-zinc-700/50">
-              <Clock className="w-3 h-3" />
-              {project.timeEstimate || '2 hours'}
-            </span>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-mono uppercase tracking-wider border border-indigo-500/20">
-              {project.category || 'DIY'}
-            </span>
-            {project.author && (
-              <span className="text-xs text-zinc-400 ml-auto flex items-center gap-1.5">
-                {project.author.avatarUrl ? (
-                  <img src={project.author.avatarUrl} className="w-4 h-4 rounded-full" />
-                ) : (
-                  <div className="w-4 h-4 rounded-full bg-zinc-700 flex items-center justify-center text-[8px] text-white">U</div>
-                )}
-                {project.author.name}
-              </span>
-            )}
-          </div>
-        </div>
-
-        <AnimatePresence>
-          {isExpanded && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden"
-            >
-              <div className="p-5 sm:p-6 border-t border-zinc-100 dark:border-zinc-850 flex flex-col gap-6" onClick={e => e.stopPropagation()}>
-                {isLoadingDetails ? (
-                  <div className="flex flex-col items-center justify-center py-10 gap-3 text-zinc-400">
-                    <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
-                    <span className="text-xs font-mono">Generating Full Instructions...</span>
-                  </div>
-                ) : (
-                  <>
-                    {/* Visual Project Image Cover */}
-                    {imageUrl ? (
-                      <div className="relative aspect-video rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900 group">
-                        <img src={imageUrl} alt={project.title} className="w-full h-full object-cover" />
-                      </div>
-                    ) : (
-                      session && (
-                        <button
-                          onClick={handleVisualize}
-                          disabled={isVisualizing}
-                          className="flex items-center justify-center gap-2 w-full py-6 border border-dashed border-zinc-300 dark:border-zinc-850 hover:bg-zinc-50 dark:hover:bg-zinc-900/40 rounded-xl text-xs font-mono text-zinc-400 hover:text-zinc-100 transition-all"
-                        >
-                          {isVisualizing ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
-                              Generating Visual Preview...
-                            </>
-                          ) : (
-                            <>
-                              <Plus className="w-4 h-4" />
-                              Generate DALL-E 3 Assembly Cover
-                            </>
-                          )}
-                        </button>
-                      )
-                    )}
-
-                    {/* Materials Needed */}
-                    {fullProject?.materials && (
-                      <div>
-                        <h4 className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-2">
-                          Required Materials
-                        </h4>
-                        <ul className="flex flex-wrap gap-2 text-xs">
-                          {fullProject.materials.map((m: any, idx: number) => (
-                            <li key={idx} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border bg-zinc-50/50 dark:bg-zinc-900/50 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800">
-                              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                              {m.material?.name || m.material}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {/* Required Tools */}
-                    {fullProject?.tools && fullProject.tools.length > 0 && (
-                      <div>
-                        <h4 className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-2">
-                          Required Tools
-                        </h4>
-                        <ul className="flex flex-wrap gap-2 text-xs">
-                          {fullProject.tools.map((t: any, idx: number) => (
-                            <li key={idx} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border bg-amber-500/5 text-amber-600 border-amber-500/20">
-                              <Wrench className="w-3.5 h-3.5" />
-                              {t.tool?.name || t.tool}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {/* Instructions Steps */}
-                    {fullProject?.steps && (
-                      <div>
-                        <h4 className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-3">
-                          Step-by-Step Instructions
-                        </h4>
-                        <ol className="space-y-4">
-                          {fullProject.steps.map((step: any, idx: number) => (
-                            <li key={idx} className="flex flex-col gap-1.5 text-sm bg-zinc-50/20 dark:bg-zinc-900/20 p-3 rounded-lg border border-zinc-100 dark:border-zinc-900">
-                              <div className="flex gap-2">
-                                <span className="flex-shrink-0 flex items-center justify-center w-5 h-5 rounded bg-indigo-500/10 text-indigo-400 font-mono text-[10px] mt-0.5">
-                                  {step.stepNumber}
-                                </span>
-                                <span className="leading-relaxed text-zinc-700 dark:text-zinc-300">{step.instruction}</span>
-                              </div>
-                              {step.safetyWarning && (
-                                <div className="text-xs text-amber-600 bg-amber-500/5 border border-amber-500/10 rounded px-2 py-1 ml-7 flex items-center gap-1.5">
-                                  <AlertCircle className="w-3.5 h-3.5" />
-                                  <span>{step.safetyWarning}</span>
-                                </div>
-                              )}
-                            </li>
-                          ))}
-                        </ol>
-                      </div>
-                    )}
-
-                    {/* Community Comments */}
-                    {session && (
-                      <div className="border-t border-zinc-200 dark:border-zinc-850 pt-4 space-y-4">
-                        <h4 className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 dark:text-zinc-500 flex items-center gap-1">
-                          Community Comments ({comments.length})
-                        </h4>
-                        
-                        <form onSubmit={handlePostComment} className="flex items-center gap-2">
-                          <input 
-                            type="text"
-                            value={commentText}
-                            onChange={e => setCommentText(e.target.value)}
-                            placeholder="Add a comment..."
-                            className="flex-1 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-950 dark:text-zinc-50 outline-none focus:border-indigo-500"
-                          />
-                          <button type="submit" className="p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors">
-                            <Send className="w-3.5 h-3.5" />
-                          </button>
-                        </form>
-
-                        <div className="space-y-3 max-h-[180px] overflow-y-auto pr-1">
-                          {comments.map((comment, idx) => (
-                            <div key={idx} className="flex gap-2.5 items-start text-xs border-b border-zinc-100 dark:border-zinc-900 pb-2">
-                              <div className="w-6 h-6 rounded-full bg-zinc-700 flex items-center justify-center text-[8px] text-white uppercase shrink-0">
-                                {comment.user?.avatarUrl ? (
-                                  <img src={comment.user.avatarUrl} className="w-full h-full rounded-full" />
-                                ) : (
-                                  comment.user?.name?.[0] || 'U'
-                                )}
-                              </div>
-                              <div className="flex-1">
-                                <div className="font-semibold text-zinc-800 dark:text-zinc-200 flex items-center justify-between">
-                                  <span>{comment.user?.name}</span>
-                                  <span className="text-[9px] text-zinc-500 font-mono">
-                                    {new Date(comment.createdAt).toLocaleDateString()}
-                                  </span>
-                                </div>
-                                <p className="text-zinc-600 dark:text-zinc-400 mt-0.5 leading-relaxed">{comment.content}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-    );
-  };
+  ];
 
   return (
-    <Toast.Provider swipeDirection="right">
-      <div className="min-h-screen bg-[#f5f5f7] dark:bg-[#050507] text-zinc-900 dark:text-zinc-50 transition-colors duration-300 selection:bg-indigo-500/30 font-sans">
+    <div className="min-h-screen bg-[#0F172A] text-slate-100 font-sans selection:bg-[#6C63FF]/30 pb-16 relative overflow-hidden">
+      
+      {/* Decorative backdrop elements */}
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#6C63FF]/10 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute top-1/3 right-1/4 w-[500px] h-[500px] bg-[#00D4FF]/5 rounded-full blur-[120px] pointer-events-none" />
+
+      <Navbar />
+
+      {/* Hero Section */}
+      <section className="relative max-w-5xl mx-auto px-6 text-center pt-20 pb-16 sm:py-32 space-y-8">
         
-        {/* Navigation Header */}
-        <header className="sticky top-0 z-50 w-full border-b border-zinc-200/50 dark:border-zinc-800/50 bg-[#f5f5f7]/80 dark:bg-[#050507]/80 backdrop-blur-xl">
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        {/* Banner indicator */}
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#6C63FF]/10 text-[#6C63FF] border border-[#6C63FF]/20 text-xs font-semibold tracking-wide uppercase font-mono animate-pulse-slow">
+          <Sparkles className="w-3.5 h-3.5 fill-current text-amber-400" />
+          AI DIY Project Generator
+        </div>
+        
+        {/* Title */}
+        <h1 className="font-display text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-tight leading-[1.15] text-white">
+          Turn Your Materials <br />
+          Into <span className="bg-gradient-to-r from-[#6C63FF] to-[#00D4FF] bg-clip-text text-transparent">Amazing DIY Projects</span>
+        </h1>
+        
+        {/* Subtitle */}
+        <p className="text-sm sm:text-base md:text-lg text-slate-400 leading-relaxed max-w-xl mx-auto font-medium">
+          Upload what you have. Let AI scan your items, suggest step-by-step blueprints, and visual assembly designs instantly.
+        </p>
+
+        {/* Buttons */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4 max-w-sm mx-auto sm:max-w-none">
+          <button 
+            onClick={handleStartCreating}
+            className="w-full sm:w-auto px-8 py-4 bg-[#6C63FF] hover:bg-[#7B68EE] text-white rounded-xl font-bold text-xs tracking-wider uppercase transition-all shadow-lg shadow-[#6C63FF]/15 cursor-pointer flex items-center justify-center gap-2"
+          >
+            Start Creating
+            <ArrowRight className="w-4 h-4" />
+          </button>
+          
+          <button 
+            onClick={handleWatchDemo}
+            className="w-full sm:w-auto px-8 py-4 bg-slate-800 hover:bg-slate-750 text-slate-200 rounded-xl font-bold text-xs tracking-wider uppercase transition-all border border-slate-700 cursor-pointer flex items-center justify-center gap-2"
+          >
+            <Play className="w-4 h-4 fill-current text-[#00D4FF]" />
+            Try Guest Demo
+          </button>
+        </div>
+
+      </section>
+
+      {/* Showcase Grid Features */}
+      <section className="max-w-5xl mx-auto px-6 space-y-12 py-12">
+        <div className="text-center space-y-3">
+          <h2 className="font-display text-2xl sm:text-4xl font-extrabold text-white">
+            Smart Features for DIY Makers
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-450 max-w-md mx-auto leading-relaxed">
+            Everything you need to turn scrap materials into functional household items.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {features.map((feat, idx) => (
             <div 
-              className="flex items-center gap-2.5 font-semibold text-sm tracking-tight cursor-pointer"
-              onClick={() => setView('input')}
+              key={idx} 
+              className="bg-[#1E293B]/40 rounded-2xl border border-slate-800 p-5.5 space-y-4 hover:border-[#6C63FF]/30 transition-all duration-300 glass-panel"
             >
-              <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-md">
-                <Wrench className="w-4 h-4" />
+              <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center shadow-inner">
+                {feat.icon}
               </div>
-              <span className="font-mono uppercase tracking-widest text-xs font-bold text-zinc-900 dark:text-white">
-                DIY Genius<span className="text-indigo-500">.AI</span>
-              </span>
+              <div className="space-y-1.5">
+                <h4 className="text-sm font-bold text-slate-200">{feat.title}</h4>
+                <p className="text-xs text-slate-450 leading-relaxed">{feat.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* How It Works */}
+      <section className="max-w-5xl mx-auto px-6 space-y-12 py-12">
+        <div className="text-center space-y-3">
+          <h2 className="font-display text-2xl sm:text-4xl font-extrabold text-white">How It Works</h2>
+          <p className="text-xs sm:text-sm text-slate-450 max-w-sm mx-auto">From messy scrap piles to finished creations in three quick steps.</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          
+          <div className="bg-[#1E293B]/30 rounded-2xl border border-slate-850 p-6 space-y-4 text-center sm:text-left">
+            <div className="w-9 h-9 rounded-xl bg-[#6C63FF]/15 text-[#6C63FF] border border-[#6C63FF]/20 flex items-center justify-center font-mono font-bold text-xs mx-auto sm:mx-0">
+              01
+            </div>
+            <h4 className="text-sm font-bold text-white">Specify Materials</h4>
+            <p className="text-xs text-slate-450 leading-relaxed">
+              Drop an image of your recycling pile or input material tags manually. The AI structures your inventory checklist instantly.
+            </p>
+          </div>
+
+          <div className="bg-[#1E293B]/30 rounded-2xl border border-slate-850 p-6 space-y-4 text-center sm:text-left">
+            <div className="w-9 h-9 rounded-xl bg-[#00D4FF]/15 text-[#00D4FF] border border-[#00D4FF]/20 flex items-center justify-center font-mono font-bold text-xs mx-auto sm:mx-0">
+              02
+            </div>
+            <h4 className="text-sm font-bold text-white">Assemble Blueprint</h4>
+            <p className="text-xs text-slate-450 leading-relaxed">
+              Choose categories (gardening, school, etc.) and difficulty. The AI designs safety limits, required tools, and outlines.
+            </p>
+          </div>
+
+          <div className="bg-[#1E293B]/30 rounded-2xl border border-slate-850 p-6 space-y-4 text-center sm:text-left">
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center justify-center font-mono font-bold text-xs mx-auto sm:mx-0">
+              03
+            </div>
+            <h4 className="text-sm font-bold text-white">Start Building</h4>
+            <p className="text-xs text-slate-450 leading-relaxed">
+              Use our interactive checklist step navigator, view DALL-E diagrams, export to printer, and log comment feedback.
+            </p>
+          </div>
+
+        </div>
+      </section>
+
+      {/* Testimonials */}
+      <section className="max-w-5xl mx-auto px-6 space-y-12 py-12">
+        <div className="text-center space-y-3">
+          <h2 className="font-display text-2xl sm:text-4xl font-extrabold text-white">
+            Loved by Crafters
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-455 max-w-sm mx-auto">
+            See how hobbyists are building items from scrap resources.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          
+          <div className="bg-[#1E293B]/20 rounded-2xl border border-slate-800 p-5 space-y-3.5 glass-panel">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center font-bold text-[10px] text-white">
+                S
+              </div>
+              <div>
+                <h5 className="text-xs font-bold text-slate-200">Sarah Jenkins</h5>
+                <p className="text-[9px] text-slate-500">Eco Crafter</p>
+              </div>
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              "I scanned old cardboard boxes and soda bottles. DIY Genius gave me blueprints for self-watering pots. The safety guidelines were extremely helpful!"
+            </p>
+          </div>
+
+          <div className="bg-[#1E293B]/20 rounded-2xl border border-slate-800 p-5 space-y-3.5 glass-panel">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center font-bold text-[10px] text-white">
+                D
+              </div>
+              <div>
+                <h5 className="text-xs font-bold text-slate-200">David Miller</h5>
+                <p className="text-[9px] text-slate-500">Student Hobbyist</p>
+              </div>
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              "The interactive checklist is so handy. I built a desktop divider and marked each step off. The PDF print format fits straight into my workshop desk."
+            </p>
+          </div>
+
+          <div className="bg-[#1E293B]/20 rounded-2xl border border-slate-800 p-5 space-y-3.5 glass-panel">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center font-bold text-[10px] text-white">
+                M
+              </div>
+              <div>
+                <h5 className="text-xs font-bold text-slate-200">Maria Lopez</h5>
+                <p className="text-[9px] text-slate-500">Parent DIYer</p>
+              </div>
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              "Great family activity creator. My kids and I scanned some plastic items and built seed feeders. Highly recommend the guest mode to check it out."
+            </p>
+          </div>
+
+        </div>
+      </section>
+
+      {/* SaaS Pricing Plans */}
+      <section className="max-w-4xl mx-auto px-6 space-y-12 py-12">
+        <div className="text-center space-y-3">
+          <h2 className="font-display text-2xl sm:text-4xl font-extrabold text-white">Simple Pricing Plans</h2>
+          <p className="text-xs sm:text-sm text-slate-450 max-w-sm mx-auto">Subscribe to unlock visual drawings, unlimited scans, and PDF downloads.</p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 max-w-2xl mx-auto">
+          
+          {/* Maker Free */}
+          <div className="bg-[#1E293B]/30 rounded-2xl border border-slate-800 p-6 flex flex-col justify-between space-y-6 glass-panel">
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-sm font-bold text-white">Maker Free</h4>
+                <p className="text-[10px] text-slate-500 font-mono mt-0.5">Explore base plans</p>
+              </div>
+              <div className="text-3xl font-black text-white">$0</div>
+              <ul className="text-xs text-slate-400 space-y-2.5 pt-2 border-t border-slate-850/50">
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> 5 Material scans per day</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> Basic step-by-step checklists</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> Community feed access</li>
+              </ul>
+            </div>
+            <button 
+              onClick={handleStartCreating} 
+              className="w-full py-2.5 bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
+            >
+              Start Free
+            </button>
+          </div>
+
+          {/* Premium */}
+          <div className="bg-[#1E293B]/80 rounded-2xl border border-[#6C63FF]/50 p-6 flex flex-col justify-between space-y-6 relative shadow-lg shadow-[#6C63FF]/5 glass-panel">
+            <div className="absolute -top-3.5 right-6 bg-[#6C63FF] text-white text-[9px] font-mono uppercase font-bold px-2.5 py-0.5 rounded-full">
+              Popular
             </div>
             
-            <div className="flex items-center gap-2 print:hidden">
-              {session ? (
-                <div className="flex items-center gap-2.5">
-                  {dbUser?.isPremium && (
-                    <span className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 px-2 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider">
-                      Premium
-                    </span>
-                  )}
-                  <SimpleTooltip content="Sign Out">
-                    <button 
-                      onClick={handleSignOut}
-                      className="p-2 rounded-md hover:bg-zinc-200/50 dark:hover:bg-zinc-855 transition-colors text-zinc-500 hover:text-rose-500"
-                    >
-                      <LogOut className="w-4 h-4" />
-                    </button>
-                  </SimpleTooltip>
-                </div>
-              ) : (
-                <span className="text-xs text-zinc-400 font-mono flex items-center gap-1.5">
-                  <LogIn className="w-3.5 h-3.5" /> Sign in for generator
-                </span>
-              )}
-              
-              <SimpleTooltip content="Toggle Theme">
-                <button 
-                  onClick={toggleTheme}
-                  className="p-2 rounded-md hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50 transition-colors text-zinc-500 dark:text-zinc-400"
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-sm font-bold text-[#6C63FF]">Genius Premium</h4>
+                <p className="text-[10px] text-slate-500 font-mono mt-0.5">Unlock the complete library</p>
+              </div>
+              <div className="text-3xl font-black text-white">$9.99<span className="text-xs text-slate-500 font-mono font-normal"> / mo</span></div>
+              <ul className="text-xs text-slate-350 space-y-2.5 pt-2 border-t border-slate-850/50">
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> Unlimited AI project blueprints</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> DALL-E illustrated covers</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> Downloadable styled print blueprints</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> Chatbot assistant panels</li>
+              </ul>
+            </div>
+            
+            <button 
+              onClick={handleStartCreating} 
+              className="w-full py-2.5 bg-[#6C63FF] hover:bg-[#7B68EE] text-white rounded-lg text-xs font-semibold cursor-pointer transition-all shadow-md shadow-[#6C63FF]/15"
+            >
+              Upgrade Now
+            </button>
+          </div>
+
+        </div>
+      </section>
+
+      {/* FAQ Accordions */}
+      <section className="max-w-3xl mx-auto px-6 space-y-12 py-12">
+        <div className="text-center space-y-3">
+          <h2 className="font-display text-2xl sm:text-4xl font-extrabold text-white">
+            Frequently Asked Questions
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-455 max-w-sm mx-auto">
+            Got questions about scanning, safety, or exports? We have answers.
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          {faqs.map((faq, idx) => {
+            const isOpen = activeFaq === idx;
+            return (
+              <div 
+                key={idx} 
+                className="bg-[#1E293B]/30 border border-slate-800 rounded-xl overflow-hidden glass-panel"
+              >
+                <button
+                  onClick={() => setActiveFaq(isOpen ? null : idx)}
+                  className="w-full px-5 py-4 flex items-center justify-between gap-4 text-left font-bold text-xs sm:text-sm text-slate-200 hover:text-white transition-colors cursor-pointer"
                 >
-                  {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                  <span className="flex items-center gap-2">
+                    <HelpCircle className="w-4 h-4 text-[#00D4FF] shrink-0" />
+                    {faq.q}
+                  </span>
+                  <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                 </button>
-              </SimpleTooltip>
-            </div>
-          </div>
-        </header>
 
-        {/* Auth form if not authenticated */}
-        {!session && (
-          <div className="min-h-[calc(100vh-4rem)] grid grid-cols-1 lg:grid-cols-12 max-w-6xl mx-auto px-4 sm:px-6 py-12 lg:py-20 gap-12 items-center">
-            {/* Left side: Premium Hero Branding & Value Props */}
-            <div className="lg:col-span-7 space-y-8 text-left">
-              <div className="space-y-4">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 text-xs font-semibold tracking-wide uppercase font-mono">
-                  <Sparkles className="w-3.5 h-3.5 fill-current" />
-                  AI Crafting & DIY Platform
-                </div>
-                <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-tight text-zinc-900 dark:text-white">
-                  Turn Leftover <br />
-                  Materials Into <span className="bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent">DIY Genius</span>
-                </h1>
-                <p className="text-sm sm:text-base text-zinc-550 dark:text-zinc-400 leading-relaxed max-w-xl">
-                  Analyze your available materials using computer vision, discover tailored project blueprints, and generate safety-first assembly guides instantly.
-                </p>
+                {isOpen && (
+                  <div className="px-5 pb-4.5 pt-0 text-xs text-slate-400 leading-relaxed border-t border-slate-850/30">
+                    {faq.a}
+                  </div>
+                )}
               </div>
+            );
+          })}
+        </div>
+      </section>
 
-              {/* Feature Highlights */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-xl pt-4">
-                <div className="flex gap-3.5">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0 border border-emerald-500/20">
-                    <CheckCircle2 className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Material Detection</h4>
-                    <p className="text-[11px] text-zinc-500 leading-normal">Scan items using advanced computer vision.</p>
-                  </div>
-                </div>
-                <div className="flex gap-3.5">
-                  <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0 border border-indigo-500/20">
-                    <CheckCircle2 className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-zinc-800 dark:text-zinc-200">AI Project Generation</h4>
-                    <p className="text-[11px] text-zinc-500 leading-normal">Tailor instructions to your difficulty level.</p>
-                  </div>
-                </div>
-                <div className="flex gap-3.5">
-                  <div className="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center shrink-0 border border-purple-500/20">
-                    <CheckCircle2 className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Visual Step Blueprints</h4>
-                    <p className="text-[11px] text-zinc-500 leading-normal">DALL-E 3 assembly cover illustrations.</p>
-                  </div>
-                </div>
-                <div className="flex gap-3.5">
-                  <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0 border border-amber-500/20">
-                    <CheckCircle2 className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Premium SaaS Exports</h4>
-                    <p className="text-[11px] text-zinc-500 leading-normal">Download professional PDFs and script guides.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+      {/* Footer */}
+      <footer className="border-t border-slate-900 pt-12 text-center text-slate-500 text-[10px] font-mono max-w-6xl mx-auto space-y-2.5">
+        <p>© 2026 DIY Genius AI. All rights reserved. Made by BKiran27.</p>
+        <p className="text-slate-655">Empowering craft creators to build items from available home scrap resource materials.</p>
+      </footer>
 
-            {/* Right side: Login Card */}
-            <div className="lg:col-span-5 w-full">
-              <div className="bg-white dark:bg-[#0a0a0c] rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 sm:p-8 space-y-6 shadow-xl hover:shadow-2xl transition-all duration-300">
-                <div className="text-center space-y-2">
-                  <h2 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white font-display">
-                    {isSignUp ? 'Create SaaS Account' : 'Welcome Maker'}
-                  </h2>
-                  <p className="text-xs text-zinc-550">
-                    {isSignUp ? 'Sign up to build, scan, and generate DIY projects.' : 'Sign in to access your DIY Workspace.'}
-                  </p>
-                </div>
-
-                <form onSubmit={handleAuth} className="space-y-4">
-                  {isSignUp && (
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-mono uppercase text-zinc-400">Full Name</label>
-                      <input 
-                        type="text" 
-                        required
-                        value={authName}
-                        onChange={e => setAuthName(e.target.value)}
-                        placeholder="John Doe"
-                        className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-zinc-950 dark:text-zinc-50 outline-none focus:border-indigo-500"
-                      />
-                    </div>
-                  )}
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-mono uppercase text-zinc-400">Email Address</label>
-                    <input 
-                      type="email" 
-                      required
-                      value={authEmail}
-                      onChange={e => setAuthEmail(e.target.value)}
-                      placeholder="maker@diygenius.ai"
-                      className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-zinc-950 dark:text-zinc-50 outline-none focus:border-indigo-500"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-mono uppercase text-zinc-400">Password</label>
-                    <input 
-                      type="password" 
-                      required
-                      value={authPassword}
-                      onChange={e => setAuthPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-zinc-950 dark:text-zinc-50 outline-none focus:border-indigo-500"
-                    />
-                  </div>
-
-                  {error && (
-                    <div className="text-xs text-rose-500 bg-rose-500/5 border border-rose-500/10 p-2.5 rounded-lg flex items-center gap-1.5">
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                      <span>{error}</span>
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={authLoading}
-                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    {authLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                    {isSignUp ? 'Sign Up' : 'Sign In'}
-                  </button>
-
-                  {!isSignUp && (
-                    <>
-                      <div className="relative flex py-2 items-center">
-                        <div className="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
-                        <span className="flex-shrink mx-4 text-zinc-450 text-[10px] font-mono uppercase font-semibold">Or</span>
-                        <div className="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={handleGuestLogin}
-                        className="w-full py-3 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900/60 dark:hover:bg-zinc-900 text-zinc-900 dark:text-white rounded-xl font-semibold text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-2 border border-zinc-200 dark:border-zinc-800/80 shadow-sm cursor-pointer"
-                      >
-                        <Sparkles className="w-3.5 h-3.5 text-indigo-500 fill-current" />
-                        Continue as Demo Guest
-                      </button>
-                    </>
-                  )}
-                </form>
-
-                <div className="text-center pt-2">
-                  <button 
-                    onClick={() => { setIsSignUp(!isSignUp); setError(null); }}
-                    className="text-xs text-indigo-500 hover:underline font-semibold cursor-pointer"
-                  >
-                    {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Authenticated Workspace View */}
-        {session && (
-          <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10 overflow-hidden">
-            <AnimatePresence mode="wait">
-              {view === 'input' ? (
-                <motion.div 
-                  key="input-view"
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -15, filter: 'blur(5px)' }}
-                  className="max-w-2xl mx-auto space-y-12"
-                >
-                  {/* Hero Intro */}
-                  <div className="text-center space-y-4">
-                    <h1 className="font-display text-4xl sm:text-5xl font-extrabold tracking-tight text-zinc-900 dark:text-white leading-tight">
-                      AI DIY Project <br />
-                      <span className="bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent">Genius Creator</span>
-                    </h1>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-md mx-auto leading-relaxed">
-                      Upload photos to scan materials automatically, choose categories, and let AI outline safety-first craft projects.
-                    </p>
-                  </div>
-
-                  {/* Radix Tabs Nav */}
-                  <Tabs.Root value={activeTab} onValueChange={setActiveTab} className="w-full">
-                    <Tabs.List className="flex w-full border-b border-zinc-200 dark:border-zinc-800 mb-8">
-                      <Tabs.Trigger 
-                        value="generate" 
-                        className="flex-1 pb-3 text-xs font-mono uppercase tracking-wider text-zinc-400 hover:text-zinc-900 dark:hover:text-white data-[state=active]:text-indigo-500 dark:data-[state=active]:text-indigo-400 data-[state=active]:border-b-2 data-[state=active]:border-indigo-500 transition-all font-semibold"
-                      >
-                        DIY Workspace
-                      </Tabs.Trigger>
-                      <Tabs.Trigger 
-                        value="community" 
-                        className="flex-1 pb-3 text-xs font-mono uppercase tracking-wider text-zinc-400 hover:text-zinc-900 dark:hover:text-white data-[state=active]:text-indigo-500 dark:data-[state=active]:text-indigo-400 data-[state=active]:border-b-2 data-[state=active]:border-indigo-500 transition-all font-semibold"
-                      >
-                        Community Ideas
-                      </Tabs.Trigger>
-                      <Tabs.Trigger 
-                        value="saved" 
-                        className="flex-1 pb-3 text-xs font-mono uppercase tracking-wider text-zinc-400 hover:text-zinc-900 dark:hover:text-white data-[state=active]:text-indigo-500 dark:data-[state=active]:text-indigo-400 data-[state=active]:border-b-2 data-[state=active]:border-indigo-500 transition-all font-semibold flex items-center justify-center gap-1.5"
-                      >
-                        Saved
-                        {savedProjects.length > 0 && (
-                          <span className="bg-indigo-600 text-white py-0.5 px-1.5 rounded-full text-[9px] font-mono">
-                            {savedProjects.length}
-                          </span>
-                        )}
-                      </Tabs.Trigger>
-                      <Tabs.Trigger 
-                        value="premium" 
-                        className="flex-1 pb-3 text-xs font-mono uppercase tracking-wider text-indigo-400 hover:text-indigo-300 data-[state=active]:text-indigo-500 dark:data-[state=active]:text-indigo-400 data-[state=active]:border-b-2 data-[state=active]:border-indigo-500 transition-all font-semibold flex items-center justify-center gap-1"
-                      >
-                        <Sparkles className="w-3.5 h-3.5 fill-current" />
-                        Billing
-                      </Tabs.Trigger>
-                    </Tabs.List>
-
-                    {/* Generate Content Tab */}
-                    <Tabs.Content value="generate" className="outline-none">
-                      <div className="bg-white dark:bg-[#0a0a0c] rounded-2xl border border-zinc-200 dark:border-zinc-800/80 p-6 sm:p-8 space-y-6 shadow-md relative overflow-hidden">
-                        
-                        {/* Material Upload Zone */}
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 flex items-center justify-between">
-                            <span>01. Scan Materials (Optional)</span>
-                            {isScanning && <span className="text-indigo-500 font-semibold flex items-center gap-1 animate-pulse"><Loader2 className="w-3 h-3 animate-spin" /> Analyzing Image...</span>}
-                          </label>
-                          <div className="border border-dashed border-zinc-300 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900/40 rounded-xl p-6 text-center cursor-pointer bg-zinc-50/20 dark:bg-zinc-900/10">
-                            <input 
-                              type="file" 
-                              accept="image/*" 
-                              className="hidden" 
-                              id="image-scanner"
-                              onChange={handleImageUpload}
-                            />
-                            <label htmlFor="image-scanner" className="cursor-pointer flex flex-col items-center gap-2">
-                              <Plus className="w-5 h-5 text-zinc-500" />
-                              <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-350 hover:underline">Click to scan image</span>
-                            </label>
-                          </div>
-                        </div>
-
-                        {/* Materials Tags List */}
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 flex items-center justify-between">
-                            <span>02. Available Materials List</span>
-                            <span className="text-[9px] bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-500">Press Enter</span>
-                          </label>
-                          <div className="min-h-[100px] p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-[#0f0f12] flex flex-wrap gap-2 items-start content-start">
-                            <AnimatePresence>
-                              {materials.map((mat) => (
-                                <motion.span
-                                  key={mat}
-                                  initial={{ opacity: 0, scale: 0.9 }}
-                                  animate={{ opacity: 1, scale: 1 }}
-                                  exit={{ opacity: 0, scale: 0.9 }}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white dark:bg-zinc-800 text-xs font-medium text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 shadow-sm"
-                                >
-                                  {mat}
-                                  <button onClick={() => removeMaterial(mat)} className="text-zinc-400 hover:text-rose-500 focus:outline-none">
-                                    <X className="w-3.5 h-3.5" />
-                                  </button>
-                                </motion.span>
-                              ))}
-                            </AnimatePresence>
-                            <input
-                              type="text"
-                              value={inputValue}
-                              onChange={(e) => setInputValue(e.target.value)}
-                              onKeyDown={handleAddMaterial}
-                              placeholder={materials.length === 0 ? "Type material (e.g. Cardboard box, string)..." : "Add another..."}
-                              className="flex-1 min-w-[150px] bg-transparent border-none outline-none py-1 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 font-mono"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Difficulty and Category selectors */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">03. Difficulty</label>
-                            <select 
-                              value={difficulty} 
-                              onChange={e => setDifficulty(e.target.value as any)}
-                              className="w-full bg-zinc-50 dark:bg-[#0f0f12] border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2.5 text-xs outline-none text-zinc-700 dark:text-zinc-350 cursor-pointer"
-                            >
-                              <option value="EASY">Easy</option>
-                              <option value="MEDIUM">Medium</option>
-                              <option value="HARD">Hard</option>
-                            </select>
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">04. Category Hint</label>
-                            <select 
-                              value={category} 
-                              onChange={e => setCategory(e.target.value)}
-                              className="w-full bg-zinc-50 dark:bg-[#0f0f12] border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2.5 text-xs outline-none text-zinc-700 dark:text-zinc-350 cursor-pointer"
-                            >
-                              <option value="Surprise Me">Surprise Me</option>
-                              <option value="Home Improvement">Home Improvement</option>
-                              <option value="Crafts">Crafts</option>
-                              <option value="Gardening">Gardening</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        {/* Error Message */}
-                        {error && (
-                          <div className="flex items-center gap-2 text-xs text-rose-500 bg-rose-500/5 p-3 rounded-lg border border-rose-500/10">
-                            <AlertCircle className="w-4 h-4 shrink-0" />
-                            <p>{error}</p>
-                          </div>
-                        )}
-
-                        {/* Generate Trigger */}
-                        <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800/60">
-                          <button
-                            onClick={handleGenerate}
-                            disabled={isGenerating || materials.length === 0}
-                            className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3.5 px-6 transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-indigo-500/10"
-                          >
-                            {isGenerating ? (
-                              <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                <span className="text-sm font-mono tracking-wider uppercase">Engineering Blueprints...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Sparkles className="w-4 h-4" />
-                                <span className="text-sm font-mono tracking-wider uppercase">Generate Project Blueprints</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    </Tabs.Content>
-
-                    {/* Community feed Tab Content */}
-                    <Tabs.Content value="community" className="outline-none">
-                      <div className="space-y-6">
-                        {/* Search Filter Bar */}
-                        <div className="flex gap-2">
-                          <input 
-                            type="text" 
-                            value={searchQuery}
-                            onChange={e => setSearchQuery(e.target.value)}
-                            placeholder="Search projects by query (semantic vector matching)..."
-                            className="flex-1 bg-white dark:bg-[#0a0a0c] border border-zinc-255 dark:border-zinc-855 rounded-xl px-4 py-3 text-xs text-zinc-955 dark:text-zinc-55 outline-none focus:border-indigo-500"
-                          />
-                        </div>
-
-                        {communityProjects.length === 0 ? (
-                          <div className="text-center py-20 bg-white dark:bg-[#0a0a0c] rounded-2xl border border-zinc-200 dark:border-zinc-800/80">
-                            <Sparkles className="w-8 h-8 mx-auto text-zinc-300 dark:text-zinc-700 mb-2" />
-                            <h3 className="text-sm font-medium text-zinc-900 dark:text-white mb-1">No community projects found</h3>
-                            <p className="text-xs text-zinc-500 dark:text-zinc-400">Search for something else or generate a project first!</p>
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-1 gap-6">
-                            {communityProjects.map(project => (
-                              <ProjectCard key={project.id} project={project} />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </Tabs.Content>
-
-                    {/* Saved Bookmarks Tab Content */}
-                    <Tabs.Content value="saved" className="outline-none">
-                      {savedProjects.length === 0 ? (
-                        <div className="text-center py-20 bg-white dark:bg-[#0a0a0c] rounded-2xl border border-zinc-200 dark:border-zinc-800/80 border-dashed">
-                          <Bookmark className="w-8 h-8 mx-auto text-zinc-300 dark:text-zinc-700 mb-3" />
-                          <h3 className="text-sm font-medium text-zinc-900 dark:text-white mb-1">No bookmarked blueprints</h3>
-                          <p className="text-xs text-zinc-500 dark:text-zinc-400">Bookmark projects to see them here.</p>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-1 gap-6">
-                          {savedProjects.map(project => (
-                            <ProjectCard key={project.id} project={project} isSavedView={true} />
-                          ))}
-                        </div>
-                      )}
-                    </Tabs.Content>
-
-                    {/* Billing Upgrades Content */}
-                    <Tabs.Content value="premium" className="outline-none">
-                      <div className="bg-white dark:bg-[#0a0a0c] rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 sm:p-8 space-y-6 shadow-md text-center max-w-md mx-auto">
-                        <div className="w-12 h-12 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mx-auto mb-2">
-                          <Sparkles className="w-6 h-6 fill-current" />
-                        </div>
-                        <h2 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
-                          Unlock DIY Genius Premium
-                        </h2>
-                        <p className="text-xs text-zinc-500 leading-relaxed">
-                          Get unlimited scanning, DALL-E 3 visual previews, professional blueprint exports to PDF, and video tutorial script guides.
-                        </p>
-                        
-                        <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800/50">
-                          <span className="text-3xl font-extrabold text-zinc-955 dark:text-white">$9.99</span>
-                          <span className="text-xs text-zinc-500 font-mono"> / month</span>
-                        </div>
-
-                        {dbUser?.isPremium ? (
-                          <div className="py-2.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-mono uppercase tracking-wider font-semibold">
-                            You are a Premium Member
-                          </div>
-                        ) : (
-                          <button
-                            onClick={handleUpgrade}
-                            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-mono uppercase tracking-wider font-semibold transition-all hover:shadow-lg"
-                          >
-                            Upgrade Now via Stripe
-                          </button>
-                        )}
-                      </div>
-                    </Tabs.Content>
-                  </Tabs.Root>
-                </motion.div>
-              ) : (
-                <motion.div 
-                  key="results-view"
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -15, filter: 'blur(5px)' }}
-                  className="space-y-6 max-w-3xl mx-auto"
-                >
-                  <div>
-                    <button 
-                      onClick={() => setView('input')}
-                      className="inline-flex items-center gap-1 text-xs font-mono uppercase tracking-wider text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors mb-2"
-                    >
-                      <ArrowLeft className="w-3.5 h-3.5" />
-                      Back to input
-                    </button>
-                    <h2 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
-                      Recommended DIY Projects
-                    </h2>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                      We matched your materials list. Expand any project to generate a detailed assembly sequence and blueprints.
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-6">
-                    {isGenerating ? (
-                      Array.from({ length: 3 }).map((_, i) => (
-                        <div key={i} className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0f0f12] overflow-hidden shadow-sm animate-pulse">
-                          <div className="p-6 space-y-4">
-                            <div className="h-6 w-1/3 bg-zinc-200 dark:bg-zinc-800 rounded-md"></div>
-                            <div className="h-4 w-5/6 bg-zinc-200 dark:bg-zinc-800 rounded-md"></div>
-                            <div className="h-4 w-2/3 bg-zinc-200 dark:bg-zinc-800 rounded-md"></div>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      projects.map((project, idx) => (
-                        <ProjectCard key={project.id || idx} project={project} />
-                      ))
-                    )}
-                    
-                    {!isGenerating && projects.length === 0 && (
-                       <div className="text-center py-12 text-zinc-500 dark:text-zinc-400 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl">
-                         No project recommendations found. Try adding more materials.
-                       </div>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </main>
-        )}
-
-        {/* Global Toast Notifications */}
-        <Toast.Root 
-          open={toastOpen} 
-          onOpenChange={setToastOpen}
-          className="bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-lg rounded-lg p-3.5 flex items-center gap-3 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:slide-in-from-bottom-full sm:w-auto z-[200]"
-        >
-          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-          <Toast.Title className="text-xs font-semibold">{toastMessage}</Toast.Title>
-        </Toast.Root>
-        <Toast.Viewport className="fixed bottom-0 right-0 p-6 w-full sm:w-auto max-w-sm z-[100] flex flex-col gap-2 outline-none" />
-      </div>
-    </Toast.Provider>
+      {/* Global overlays */}
+      <AuthDialog />
+      <CustomToast />
+    </div>
   );
 }

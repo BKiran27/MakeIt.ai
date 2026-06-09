@@ -2,12 +2,91 @@
 @plugin "@tailwindcss/typography";
 
 @theme {
+  --color-primary: #6C63FF;
+  --color-primary-light: #7B68EE;
+  --color-secondary: #00D4FF;
+  --color-accent: #FFB800;
+  --color-success: #22C55E;
+  --color-background-custom: #0F172A;
+  --color-card-custom: #1E293B;
+  --color-text-custom: #F8FAFC;
+  --color-text-muted: #94A3B8;
+
+  --font-sans: var(--font-sans);
   --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+
   --animate-shimmer: shimmer 1.5s infinite;
-  
+  --animate-scan: scan 2.5s ease-in-out infinite;
+  --animate-float: float 8s ease-in-out infinite;
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
   @keyframes shimmer {
     100% {
       transform: translateX(100%);
     }
   }
+  @keyframes scan {
+    0%, 100% {
+      transform: translateY(0%);
+    }
+    50% {
+      transform: translateY(100%);
+    }
+  }
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0px) rotate(0deg);
+    }
+    50% {
+      transform: translateY(-8px) rotate(1deg);
+    }
+  }
+}
+
+/* Glassmorphism panel styling */
+.glass-panel {
+  background: rgba(30, 41, 59, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glass-panel-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-panel-hover:hover {
+  background: rgba(30, 41, 59, 0.6);
+  border-color: rgba(108, 99, 255, 0.3);
+  box-shadow: 0 10px 30px -10px rgba(108, 99, 255, 0.15);
+}
+
+/* Custom scrollbars */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.15);
+  border-radius: 9999px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.3);
+}
+
+/* Custom layout helpers */
+.masonry-grid {
+  column-fill: balance;
 }
