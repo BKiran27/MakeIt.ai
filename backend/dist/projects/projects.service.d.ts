@@ -32,13 +32,13 @@ export declare class ProjectsService {
             toolId: string;
         })[];
         steps: {
+            projectId: string;
             id: string;
             createdAt: Date;
+            safetyWarning: string | null;
             imageUrl: string | null;
             stepNumber: number;
             instruction: string;
-            safetyWarning: string | null;
-            projectId: string;
         }[];
     } & {
         id: string;
@@ -61,17 +61,17 @@ export declare class ProjectsService {
                 avatarUrl: string | null;
             };
         } & {
+            userId: string;
+            projectId: string;
             id: string;
             createdAt: Date;
             updatedAt: Date;
-            projectId: string;
-            userId: string;
             content: string;
         })[];
         likes: {
-            createdAt: Date;
-            projectId: string;
             userId: string;
+            projectId: string;
+            createdAt: Date;
         }[];
         materials: ({
             material: {
@@ -100,13 +100,13 @@ export declare class ProjectsService {
             toolId: string;
         })[];
         steps: {
+            projectId: string;
             id: string;
             createdAt: Date;
+            safetyWarning: string | null;
             imageUrl: string | null;
             stepNumber: number;
             instruction: string;
-            safetyWarning: string | null;
-            projectId: string;
         }[];
     } & {
         id: string;

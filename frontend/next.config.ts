@@ -1,7 +1,5 @@
 import type {NextConfig} from 'next';
 
-const isProd = process.env.NODE_ENV === 'production';
-
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   eslint: {
@@ -9,11 +7,6 @@ const nextConfig: NextConfig = {
   },
   typescript: {
     ignoreBuildErrors: false,
-  },
-  output: 'export',
-  basePath: isProd ? '/MakeIt.ai' : '',
-  images: {
-    unoptimized: true,
   },
   transpilePackages: ['motion'],
   webpack: (config, {dev}) => {

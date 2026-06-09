@@ -26,6 +26,10 @@ let AiService = class AiService {
         });
     }
     async detectMaterials(imageBuffer, mimeType) {
+        const apiKey = this.configService.get('OPENAI_API_KEY');
+        if (!apiKey || apiKey === 'mock-key') {
+            return ['cardboard box', 'plastic bottle', 'glue', 'scissors', 'acrylic paint'];
+        }
         const base64Image = imageBuffer.toString('base64');
         try {
             const response = await this.openai.chat.completions.create({
@@ -58,6 +62,41 @@ let AiService = class AiService {
         }
     }
     async generateProjects(materials, difficulty, category) {
+        const apiKey = this.configService.get('OPENAI_API_KEY');
+        if (!apiKey || apiKey === 'mock-key') {
+            return [
+                {
+                    id: 'mock-proj-1',
+                    title: 'Eco-Friendly Self-Watering Planter',
+                    description: 'A brilliant self-watering planter made by upcycling plastic bottles. Perfect for small indoor herbs and flowers.',
+                    difficulty: difficulty || 'EASY',
+                    timeEstimate: '30 mins',
+                    costEstimate: '$0',
+                    materialsNeeded: ['plastic bottle', 'glue'],
+                    category: category || 'Gardening',
+                },
+                {
+                    id: 'mock-proj-2',
+                    title: 'Geometric Desk Organizer',
+                    description: 'A stylish and modern desk organizer built entirely out of sturdy cardboard pieces. Perfect for storing pens, rulers, and craft tools.',
+                    difficulty: difficulty || 'EASY',
+                    timeEstimate: '1.5 hours',
+                    costEstimate: '$0 - $5',
+                    materialsNeeded: ['cardboard box', 'glue', 'scissors'],
+                    category: category || 'Crafts',
+                },
+                {
+                    id: 'mock-proj-3',
+                    title: 'Artistic Storage Caddy',
+                    description: 'An elegant carrying caddy constructed from thick cardboard, detailed with acrylic paint, and divided using bottle parts.',
+                    difficulty: difficulty || 'MEDIUM',
+                    timeEstimate: '2 hours',
+                    costEstimate: '$5 - $10',
+                    materialsNeeded: ['cardboard box', 'plastic bottle', 'acrylic paint'],
+                    category: category || 'Crafts',
+                }
+            ];
+        }
         try {
             const response = await this.openai.chat.completions.create({
                 model: 'gpt-4o',
@@ -82,6 +121,34 @@ let AiService = class AiService {
         }
     }
     async generateProjectSteps(projectTitle, materials) {
+        const apiKey = this.configService.get('OPENAI_API_KEY');
+        if (!apiKey || apiKey === 'mock-key') {
+            return {
+                requiredTools: ['scissors', 'ruler', 'hot glue gun'],
+                safetyWarnings: ['Use scissors carefully to avoid cuts.', 'Adult supervision required when using the hot glue gun.'],
+                steps: [
+                    {
+                        stepNumber: 1,
+                        instruction: `Collect your materials: ${materials.join(', ')}. Clean and dry all containers before starting.`,
+                        safetyWarning: 'Ensure containers are completely clean of any chemical residue.'
+                    },
+                    {
+                        stepNumber: 2,
+                        instruction: 'Carefully measure and cut the materials using your scissors and ruler to match the design blueprint.',
+                        safetyWarning: 'Cut slowly and always direct blades away from your fingers.'
+                    },
+                    {
+                        stepNumber: 3,
+                        instruction: 'Use the hot glue gun to assemble the cut pieces together, holding each joint for 10 seconds to ensure a secure bond.',
+                        safetyWarning: 'Do not touch the heated metal tip or the hot melted glue.'
+                    },
+                    {
+                        stepNumber: 4,
+                        instruction: 'Decorate the finished assembly with acrylic paint to give it a custom premium finish, then let it dry.',
+                    }
+                ]
+            };
+        }
         try {
             const response = await this.openai.chat.completions.create({
                 model: 'gpt-4o',
@@ -105,6 +172,10 @@ let AiService = class AiService {
         }
     }
     async generateProjectImage(projectTitle, description) {
+        const apiKey = this.configService.get('OPENAI_API_KEY');
+        if (!apiKey || apiKey === 'mock-key') {
+            return 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?q=80&w=600&auto=format&fit=crop';
+        }
         try {
             const response = await this.openai.images.generate({
                 model: 'dall-e-3',
@@ -120,6 +191,10 @@ let AiService = class AiService {
         }
     }
     async generateEmbedding(text) {
+        const apiKey = this.configService.get('OPENAI_API_KEY');
+        if (!apiKey || apiKey === 'mock-key') {
+            return new Array(1536).fill(0).map(() => Math.random() - 0.5);
+        }
         try {
             const response = await this.openai.embeddings.create({
                 model: 'text-embedding-3-small',

@@ -13,11 +13,11 @@ export declare class SocialController {
             avatarUrl: string | null;
         };
     } & {
+        userId: string;
+        projectId: string;
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        projectId: string;
-        userId: string;
         content: string;
     }>;
     deleteComment(req: any, id: string): Promise<{
