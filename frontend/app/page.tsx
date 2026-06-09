@@ -5,16 +5,13 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Plus, X, Hammer, Scissors, Leaf, Sparkles, 
   Moon, Sun, ArrowLeft, Clock, Wrench, Loader2,
-  AlertCircle, Bookmark, BookmarkCheck, Share2, Trash2, CheckCircle2,
-  ChevronDown, ChevronUp, Image, Globe, Link as LinkIcon, Heart, Send, LogIn, LogOut
+  AlertCircle, Bookmark, BookmarkCheck, Share2, Heart, Send, LogIn, LogOut, Settings, Key, Image as ImageIcon, CheckCircle2
 } from 'lucide-react';
 import * as Tabs from '@radix-ui/react-tabs';
 import * as Toast from '@radix-ui/react-toast';
 import * as Tooltip from '@radix-ui/react-tooltip';
+import OpenAI from 'openai';
 import { supabase } from '../lib/supabase';
-
-// API Configuration
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
 interface Project {
   id: string;
@@ -24,8 +21,8 @@ interface Project {
   timeEstimate: string;
   costEstimate: string;
   imageUrl?: string;
-  materials?: { material: { name: string } }[];
-  tools?: { tool: { name: string } }[];
+  category?: string;
+  authorId?: string;
   steps?: { stepNumber: number; instruction: string; safetyWarning?: string }[];
   likes?: { userId: string }[];
   comments?: CommentType[];
@@ -73,6 +70,10 @@ export default function DIYGenerator() {
   const [authLoading, setAuthLoading] = useState(false);
   const [dbUser, setDbUser] = useState<any>(null);
 
+  // Settings state (Client OpenAI Key)
+  const [userApiKey, setUserApiKey] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
+
   // App States
   const [materials, setMaterials] = useState<string[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -93,7 +94,13 @@ export default function DIYGenerator() {
   const [toastOpen, setToastOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
-  // Setup Auth state listener
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    setToastOpen(false);
+    setTimeout(() => setToastOpen(true), 100);
+  };
+
+  // Setup Auth state listener & LocalStorage loaders
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -109,57 +116,116 @@ export default function DIYGenerator() {
       }
     });
 
+    const key = localStorage.getItem('diy_openai_api_key') || '';
+    setUserApiKey(key);
+
     return () => subscription.unsubscribe();
   }, []);
 
-  // Sync user with backend
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
+
+  const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
+
+  // Sync user with PostgreSQL directly via Supabase Client
   const syncUser = async (currentSession: any) => {
     try {
       const nameFromMeta = currentSession.user?.user_metadata?.name || '';
-      const response = await fetch(`${API_URL}/auth/sync`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${currentSession.access_token}`,
-        },
-        body: JSON.stringify({ name: nameFromMeta || currentSession.user?.email?.split('@')[0] }),
-      });
-      if (response.ok) {
-        const data = await response.json();
+      
+      // Upsert User profile row
+      const { data, error } = await supabase
+        .from('User')
+        .select('*')
+        .eq('id', currentSession.user.id)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (!data) {
+        const { data: newUser, error: createError } = await supabase
+          .from('User')
+          .insert({
+            id: currentSession.user.id,
+            email: currentSession.user.email,
+            name: nameFromMeta || currentSession.user.email?.split('@')[0],
+            isPremium: false,
+          })
+          .select()
+          .single();
+        if (createError) throw createError;
+        setDbUser(newUser);
+      } else {
         setDbUser(data);
       }
     } catch (err) {
-      console.error('Failed to sync user with backend:', err);
+      console.error('Failed to sync user directly with Supabase:', err);
     }
   };
 
-  // Fetch saved projects
+  // Helper to initialize browser-safe OpenAI SDK
+  const getOpenAiClient = () => {
+    const key = userApiKey || process.env.NEXT_PUBLIC_OPENAI_API_KEY;
+    if (!key) {
+      setShowSettings(true);
+      throw new Error('OpenAI API Key is missing. Please set your key in Settings.');
+    }
+    return new OpenAI({
+      apiKey: key,
+      dangerouslyAllowBrowser: true,
+    });
+  };
+
+  // Save API Key
+  const handleSaveApiKey = (e: React.FormEvent) => {
+    e.preventDefault();
+    localStorage.setItem('diy_openai_api_key', userApiKey);
+    showToast('OpenAI API Key saved locally!');
+    setShowSettings(false);
+  };
+
+  // Fetch saved bookmarks directly from Supabase
   const fetchSavedProjects = async () => {
     if (!session) return;
     try {
-      const response = await fetch(`${API_URL}/projects/saved`, {
-        headers: { 'Authorization': `Bearer ${session.access_token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setSavedProjects(data.projects || []);
-      }
+      const { data, error } = await supabase
+        .from('SavedProject')
+        .select('projectId, project:Project(*)')
+        .eq('userId', session.user.id);
+      
+      if (error) throw error;
+      setSavedProjects((data || []).map((s: any) => s.project));
     } catch (e) {
       console.error(e);
     }
   };
 
-  // Fetch community projects
+  // Fetch community projects directly from Supabase
   const fetchCommunityProjects = async (queryParam = '') => {
     try {
-      const url = queryParam 
-        ? `${API_URL}/projects?query=${encodeURIComponent(queryParam)}` 
-        : `${API_URL}/projects`;
-      const response = await fetch(url);
-      if (response.ok) {
-        const data = await response.json();
-        setCommunityProjects(data.projects || []);
+      let queryBuilder = supabase
+        .from('Project')
+        .select(`
+          *,
+          likes:Like(userId),
+          comments:Comment(
+            id, content, createdAt,
+            user:User(name, avatarUrl)
+          ),
+          author:User(name, avatarUrl)
+        `);
+
+      if (queryParam) {
+        queryBuilder = queryBuilder.ilike('title', `%${queryParam}%`);
       }
+      
+      const { data, error } = await queryBuilder.order('createdAt', { ascending: false });
+      if (error) throw error;
+      setCommunityProjects(data || []);
     } catch (e) {
       console.error(e);
     }
@@ -173,7 +239,7 @@ export default function DIYGenerator() {
     }
   }, [activeTab, searchQuery, session]);
 
-  // Handle Authentication
+  // Handle Authentication via Supabase
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!authEmail || !authPassword) return;
@@ -209,60 +275,64 @@ export default function DIYGenerator() {
     showToast('Signed out successfully.');
   };
 
-  // Handle Image Scanner Upload
+  // Handle Image Scanner Upload (Vision API)
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !session) {
-      if (!session) setError('Please sign in to scan materials using AI.');
-      return;
-    }
+    if (!file) return;
     
     setIsScanning(true);
     setError(null);
-    const formData = new FormData();
-    formData.append('file', file);
 
     try {
-      const response = await fetch(`${API_URL}/materials/detect`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: formData
-      });
-
-      if (!response.ok) throw new Error('Failed to parse materials from image');
-      const data = await response.json();
+      const openaiClient = getOpenAiClient();
       
-      const newMaterials = data.materials || [];
-      if (newMaterials.length > 0) {
-        const combined = Array.from(new Set([...materials, ...newMaterials]));
-        setMaterials(combined);
-        showToast(`Detected ${newMaterials.length} materials!`);
-      } else {
-        setError('No materials detected. Try again with a clearer picture.');
-      }
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = async () => {
+        const base64Data = (reader.result as string).split(',')[1];
+        const mimeType = file.type;
+
+        try {
+          const response = await openaiClient.chat.completions.create({
+            model: 'gpt-4o',
+            messages: [
+              {
+                role: 'system',
+                content: 'You are an advanced computer vision model specialized in DIY materials recognition. Analyze the image and extract all distinct, raw materials that could be used in a crafting, construction, or gardening project. Return a JSON object containing a "materials" array of strings (lowercase). Example: {"materials": ["cardboard box", "plastic bottle", "glue"]}.',
+              },
+              {
+                role: 'user',
+                content: [
+                  {
+                    type: 'image_url',
+                    image_url: {
+                      url: `data:${mimeType};base64,${base64Data}`,
+                    },
+                  },
+                ],
+              },
+            ],
+            response_format: { type: 'json_object' },
+          });
+
+          const result = JSON.parse(response.choices[0].message.content || '{}');
+          const detected = result.materials || [];
+          if (detected.length > 0) {
+            setMaterials(Array.from(new Set([...materials, ...detected])));
+            showToast(`Detected ${detected.length} materials!`);
+          } else {
+            setError('No materials detected. Please try a clearer picture.');
+          }
+        } catch (err: any) {
+          setError(err.message || 'OpenAI API call failed.');
+        } finally {
+          setIsScanning(false);
+        }
+      };
     } catch (err: any) {
-      setError(err.message || 'Failed to detect materials.');
-    } finally {
+      setError(err.message);
       setIsScanning(false);
     }
-  };
-
-  useEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [theme]);
-
-  const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
-
-  const showToast = (message: string) => {
-    setToastMessage(message);
-    setToastOpen(false);
-    setTimeout(() => setToastOpen(true), 100);
   };
 
   const handleAddMaterial = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -281,14 +351,10 @@ export default function DIYGenerator() {
     setMaterials(materials.filter(m => m !== mat));
   };
 
-  // Generate Projects via Backend
+  // Generate Projects via client-side OpenAI
   const handleGenerate = async () => {
     if (materials.length === 0) {
       setError("Please add at least one material to get started.");
-      return;
-    }
-    if (!session) {
-      setError("Please sign in to generate DIY projects.");
       return;
     }
     
@@ -298,50 +364,29 @@ export default function DIYGenerator() {
     setView('results');
 
     try {
-      const response = await fetch(`${API_URL}/projects/generate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({
-          materials,
-          difficulty,
-          category
-        })
+      const openaiClient = getOpenAiClient();
+      const response = await openaiClient.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are "DIY Genius", an expert engineer, crafter, and maker. Suggest 3 highly creative DIY projects that primarily use the user\'s materials, though basic household items (glue, scissors, nails) can be assumed. Return a JSON object with a "projects" array. Each project should have: title, description, difficulty, timeEstimate, costEstimate, materialsNeeded, and category.',
+          },
+          {
+            role: 'user',
+            content: `Materials available: ${materials.join(', ')}. Requested Difficulty: ${difficulty}. Category Hint: ${category}.`,
+          },
+        ],
+        response_format: { type: 'json_object' },
       });
 
-      if (!response.ok) throw new Error('Server error generating projects');
-      const data = await response.json();
-      setProjects(data.projects || []);
+      const result = JSON.parse(response.choices[0].message.content || '{}');
+      setProjects(result.projects || []);
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Failed to generate projects. Please try again.");
     } finally {
       setIsGenerating(false);
-    }
-  };
-
-  // Stripe subscription Checkout
-  const handleUpgrade = async () => {
-    if (!session) return;
-    try {
-      const response = await fetch(`${API_URL}/billing/checkout`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.url) {
-          window.location.href = data.url;
-        }
-      } else {
-        showToast('Billing service unavailable right now.');
-      }
-    } catch (e) {
-      console.error(e);
     }
   };
 
@@ -361,7 +406,7 @@ export default function DIYGenerator() {
     }
   };
 
-  // Nested Project Card Component (to call /generate/steps on expand)
+  // Nested Project Card Component (performs all direct Supabase and OpenAI operations)
   const ProjectCard = ({ project, isSavedView = false }: { project: any, isSavedView?: boolean }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [fullProject, setFullProject] = useState<Project | null>(project.steps ? project : null);
@@ -388,30 +433,92 @@ export default function DIYGenerator() {
 
       setIsLoadingDetails(true);
       try {
-        // Call backend generate/steps to generate full instructions and save to Postgres
-        const response = await fetch(`${API_URL}/projects/generate/steps`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          body: JSON.stringify({
-            title: project.title,
-            description: project.description,
-            difficulty: project.difficulty || 'Easy',
-            category: project.category || 'Surprise Me',
-            materials: project.materialsNeeded || materials
-          })
-        });
+        // 1. Check if the project already exists in the Supabase db
+        let dbProjId = project.id;
+        
+        const { data: existingProject } = await supabase
+          .from('Project')
+          .select('id')
+          .eq('title', project.title)
+          .maybeSingle();
 
-        if (response.ok) {
-          const data = await response.json();
-          setFullProject(data);
-          // Sync saved projects list
-          fetchSavedProjects();
+        if (!existingProject && session) {
+          // 2. Save project draft to Supabase if logged in
+          const { data: newProj, error: createError } = await supabase
+            .from('Project')
+            .insert({
+              title: project.title,
+              description: project.description,
+              difficulty: (project.difficulty || difficulty).toUpperCase(),
+              timeEstimate: project.timeEstimate || '2 hours',
+              costEstimate: project.costEstimate || '$5 - $20',
+              authorId: session.user.id,
+              category: project.category || category,
+            })
+            .select()
+            .single();
+
+          if (createError) throw createError;
+          dbProjId = newProj.id;
+
+          // 3. Generate detailed instructions via OpenAI
+          const openaiClient = getOpenAiClient();
+          const response = await openaiClient.chat.completions.create({
+            model: 'gpt-4o',
+            messages: [
+              {
+                role: 'system',
+                content: 'You are "DIY Genius", an expert engineer, crafter, and maker. Generate step-by-step instructions for the specified project. Return a JSON object with: "requiredTools" (string array), "safetyWarnings" (string array), and "steps" (array of objects, each with "stepNumber" integer, "instruction" string, and "safetyWarning" optional string). Ensure safety instructions are prominent.',
+              },
+              {
+                role: 'user',
+                content: `Project Title: ${project.title}. Available Materials: ${(project.materialsNeeded || materials).join(', ')}.`,
+              },
+            ],
+            response_format: { type: 'json_object' },
+          });
+
+          const stepsData = JSON.parse(response.choices[0].message.content || '{}');
+
+          // 4. Save steps
+          const { error: stepsError } = await supabase
+            .from('Step')
+            .insert((stepsData.steps || []).map((s: any) => ({
+              projectId: dbProjId,
+              stepNumber: s.stepNumber,
+              instruction: s.instruction,
+              safetyWarning: s.safetyWarning || null,
+            })));
+
+          if (stepsError) throw stepsError;
+        } else if (existingProject) {
+          dbProjId = existingProject.id;
         }
-      } catch (err) {
+
+        // 5. Query complete project with relational steps/comments
+        const { data: fullProj, error: queryError } = await supabase
+          .from('Project')
+          .select(`
+            *,
+            steps:Step(*),
+            comments:Comment(
+              id, content, createdAt,
+              user:User(name, avatarUrl)
+            ),
+            likes:Like(*)
+          `)
+          .eq('id', dbProjId)
+          .single();
+
+        if (queryError) throw queryError;
+        setFullProject(fullProj);
+        setComments(fullProj.comments || []);
+        setLikeCount(fullProj.likes?.length || 0);
+        setIsLiked(fullProj.likes?.some((l: any) => l.userId === session?.user?.id));
+        fetchSavedProjects();
+      } catch (err: any) {
         console.error('Failed to load steps', err);
+        showToast(err.message || 'Error fetching project steps');
       } finally {
         setIsLoadingDetails(false);
       }
@@ -423,16 +530,29 @@ export default function DIYGenerator() {
       
       const targetId = fullProject?.id || project.id;
       try {
-        const response = await fetch(`${API_URL}/projects/${targetId}/save`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${session.access_token}` }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setIsSaved(data.saved);
-          fetchSavedProjects();
-          showToast(data.saved ? 'Project bookmarked!' : 'Bookmark removed.');
+        const { data: existing } = await supabase
+          .from('SavedProject')
+          .select('*')
+          .eq('userId', session.user.id)
+          .eq('projectId', targetId)
+          .maybeSingle();
+
+        if (existing) {
+          await supabase
+            .from('SavedProject')
+            .delete()
+            .eq('userId', session.user.id)
+            .eq('projectId', targetId);
+          setIsSaved(false);
+          showToast('Bookmark removed.');
+        } else {
+          await supabase
+            .from('SavedProject')
+            .insert({ userId: session.user.id, projectId: targetId });
+          setIsSaved(true);
+          showToast('Project bookmarked!');
         }
+        fetchSavedProjects();
       } catch (e) {
         console.error(e);
       }
@@ -444,15 +564,29 @@ export default function DIYGenerator() {
 
       const targetId = fullProject?.id || project.id;
       try {
-        const response = await fetch(`${API_URL}/projects/${targetId}/like`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${session.access_token}` }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setIsLiked(data.liked);
-          setLikeCount((prev: number) => data.liked ? prev + 1 : Math.max(0, prev - 1));
-          showToast(data.liked ? 'Liked project!' : 'Unliked project.');
+        const { data: existing } = await supabase
+          .from('Like')
+          .select('*')
+          .eq('userId', session.user.id)
+          .eq('projectId', targetId)
+          .maybeSingle();
+
+        if (existing) {
+          await supabase
+            .from('Like')
+            .delete()
+            .eq('userId', session.user.id)
+            .eq('projectId', targetId);
+          setIsLiked(false);
+          setLikeCount((prev: number) => Math.max(0, prev - 1));
+          showToast('Unliked project.');
+        } else {
+          await supabase
+            .from('Like')
+            .insert({ userId: session.user.id, projectId: targetId });
+          setIsLiked(true);
+          setLikeCount((prev: number) => prev + 1);
+          showToast('Liked project!');
         }
       } catch (e) {
         console.error(e);
@@ -461,22 +595,29 @@ export default function DIYGenerator() {
 
     const handleVisualize = async (e: React.MouseEvent) => {
       e.stopPropagation();
-      if (!session) return;
-
       const targetId = fullProject?.id || project.id;
       setIsVisualizing(true);
       try {
-        const response = await fetch(`${API_URL}/projects/${targetId}/visualize`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${session.access_token}` }
+        const openaiClient = getOpenAiClient();
+        const response = await openaiClient.images.generate({
+          model: 'dall-e-3',
+          prompt: `A high quality, modern photo of a completed DIY project: ${project.title}. Description: ${project.description}. Sleek presentation, photorealistic, no text.`,
+          n: 1,
+          size: '1024x1024',
         });
-        if (response.ok) {
-          const data = await response.json();
-          setImageUrl(data.imageUrl);
-          showToast('Image generated successfully!');
+        
+        const gUrl = response.data?.[0]?.url || '';
+        if (gUrl) {
+          await supabase
+            .from('Project')
+            .update({ imageUrl: gUrl })
+            .eq('id', targetId);
+          setImageUrl(gUrl);
+          showToast('DALL-E cover generated!');
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error(e);
+        showToast(e.message || 'Image generation failed');
       } finally {
         setIsVisualizing(false);
       }
@@ -488,20 +629,31 @@ export default function DIYGenerator() {
 
       const targetId = fullProject?.id || project.id;
       try {
-        const response = await fetch(`${API_URL}/projects/${targetId}/comments`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          body: JSON.stringify({ content: commentText })
-        });
-        if (response.ok) {
-          const newComment = await response.json();
-          setComments([newComment, ...comments]);
-          setCommentText('');
-          showToast('Comment posted!');
-        }
+        const { data: newComment, error } = await supabase
+          .from('Comment')
+          .insert({
+            userId: session.user.id,
+            projectId: targetId,
+            content: commentText
+          })
+          .select(`
+            id, content, createdAt,
+            user:User(name, avatarUrl)
+          `)
+          .single();
+
+        if (error) throw error;
+        
+        const commentUser = Array.isArray(newComment.user) ? newComment.user[0] : newComment.user;
+        const formattedComment = {
+          id: newComment.id,
+          content: newComment.content,
+          createdAt: newComment.createdAt,
+          user: commentUser || { name: 'Maker' }
+        };
+        setComments([formattedComment as any, ...comments]);
+        setCommentText('');
+        showToast('Comment posted!');
       } catch (e) {
         console.error(e);
       }
@@ -547,7 +699,7 @@ export default function DIYGenerator() {
                   <SimpleTooltip content={isLiked ? "Unlike" : "Like"}>
                     <button 
                       onClick={handleLike}
-                      className={`p-1.5 rounded-md transition-colors flex items-center gap-1 text-xs ${isLiked ? 'text-rose-500' : 'text-zinc-400 hover:text-rose-600'}`}
+                      className={`p-1.5 rounded-md transition-colors flex items-center gap-1 text-xs ${isLiked ? 'text-rose-500' : 'text-zinc-400 hover:text-rose-655'}`}
                     >
                       <Heart className="w-4 h-4" fill={isLiked ? "currentColor" : "none"} />
                       <span>{likeCount}</span>
@@ -556,7 +708,7 @@ export default function DIYGenerator() {
                   <SimpleTooltip content={isSaved ? "Remove bookmark" : "Save project"}>
                     <button 
                       onClick={handleSave}
-                      className={`p-1.5 rounded-md transition-colors ${isSaved ? 'text-indigo-500' : 'text-zinc-400 hover:text-indigo-400'}`}
+                      className={`p-1.5 rounded-md transition-colors ${isSaved ? 'text-indigo-500' : 'text-zinc-400 hover:text-indigo-450'}`}
                     >
                       {isSaved ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
                     </button>
@@ -628,46 +780,12 @@ export default function DIYGenerator() {
                             </>
                           ) : (
                             <>
-                              <Image className="w-4 h-4" />
+                              <ImageIcon className="w-4 h-4" />
                               Generate DALL-E 3 Assembly Cover
                             </>
                           )}
                         </button>
                       )
-                    )}
-
-                    {/* Materials Needed */}
-                    {fullProject?.materials && (
-                      <div>
-                        <h4 className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-2">
-                          Required Materials
-                        </h4>
-                        <ul className="flex flex-wrap gap-2 text-xs">
-                          {fullProject.materials.map((m: any, idx: number) => (
-                            <li key={idx} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border bg-zinc-50/50 dark:bg-zinc-900/50 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800">
-                              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                              {m.material.name}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {/* Required Tools */}
-                    {fullProject?.tools && fullProject.tools.length > 0 && (
-                      <div>
-                        <h4 className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 dark:text-zinc-500 mb-2">
-                          Required Tools
-                        </h4>
-                        <ul className="flex flex-wrap gap-2 text-xs">
-                          {fullProject.tools.map((t: any, idx: number) => (
-                            <li key={idx} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border bg-amber-500/5 text-amber-600 border-amber-500/20">
-                              <Wrench className="w-3.5 h-3.5" />
-                              {t.tool.name}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
                     )}
 
                     {/* Instructions Steps */}
@@ -771,13 +889,17 @@ export default function DIYGenerator() {
             </div>
             
             <div className="flex items-center gap-2 print:hidden">
+              <SimpleTooltip content="OpenAI Configurations">
+                <button 
+                  onClick={() => setShowSettings(true)}
+                  className={`p-2 rounded-md transition-colors ${userApiKey ? 'text-emerald-500' : 'text-zinc-500 hover:text-indigo-400'}`}
+                >
+                  <Settings className="w-4 h-4" />
+                </button>
+              </SimpleTooltip>
+
               {session ? (
                 <div className="flex items-center gap-2.5">
-                  {dbUser?.isPremium && (
-                    <span className="bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 px-2 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider">
-                      Premium
-                    </span>
-                  )}
                   <SimpleTooltip content="Sign Out">
                     <button 
                       onClick={handleSignOut}
@@ -789,7 +911,7 @@ export default function DIYGenerator() {
                 </div>
               ) : (
                 <span className="text-xs text-zinc-400 font-mono flex items-center gap-1.5">
-                  <LogIn className="w-3.5 h-3.5" /> Sign in for generator
+                  <LogIn className="w-3.5 h-3.5" /> Sign in for workspace
                 </span>
               )}
               
@@ -804,6 +926,47 @@ export default function DIYGenerator() {
             </div>
           </div>
         </header>
+
+        {/* Settings API Key Modal */}
+        <AnimatePresence>
+          {showSettings && (
+            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="w-full max-w-md bg-white dark:bg-[#0a0a0c] border border-zinc-250 dark:border-zinc-850 p-6 rounded-2xl shadow-2xl relative"
+              >
+                <button 
+                  onClick={() => setShowSettings(false)}
+                  className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-100"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+                <h3 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2 mb-2">
+                  <Key className="w-4 h-4 text-indigo-500" />
+                  OpenAI Configuration
+                </h3>
+                <p className="text-xs text-zinc-500 mb-4 leading-relaxed">
+                  Provide your own OpenAI API key. All request executions occur entirely in your browser window and do not travel to any intermediary servers.
+                </p>
+
+                <form onSubmit={handleSaveApiKey} className="space-y-4">
+                  <input 
+                    type="password"
+                    value={userApiKey}
+                    onChange={e => setUserApiKey(e.target.value)}
+                    placeholder="sk-proj-..."
+                    className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-zinc-950 dark:text-zinc-50 outline-none focus:border-indigo-500"
+                  />
+                  <button type="submit" className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-mono tracking-wider uppercase font-semibold">
+                    Save Key Locally
+                  </button>
+                </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
         {/* Auth form if not authenticated */}
         {!session && (
@@ -912,19 +1075,19 @@ export default function DIYGenerator() {
                     <Tabs.List className="flex w-full border-b border-zinc-200 dark:border-zinc-800 mb-8">
                       <Tabs.Trigger 
                         value="generate" 
-                        className="flex-1 pb-3 text-xs font-mono uppercase tracking-wider text-zinc-400 hover:text-zinc-900 dark:hover:text-white data-[state=active]:text-indigo-500 dark:data-[state=active]:text-indigo-400 data-[state=active]:border-b-2 data-[state=active]:border-indigo-500 transition-all font-semibold"
+                        className="flex-1 pb-3 text-xs font-mono uppercase tracking-wider text-zinc-400 hover:text-zinc-900 dark:hover:white data-[state=active]:text-indigo-500 dark:data-[state=active]:text-indigo-400 data-[state=active]:border-b-2 data-[state=active]:border-indigo-500 transition-all font-semibold"
                       >
                         DIY Workspace
                       </Tabs.Trigger>
                       <Tabs.Trigger 
                         value="community" 
-                        className="flex-1 pb-3 text-xs font-mono uppercase tracking-wider text-zinc-400 hover:text-zinc-900 dark:hover:text-white data-[state=active]:text-indigo-500 dark:data-[state=active]:text-indigo-400 data-[state=active]:border-b-2 data-[state=active]:border-indigo-500 transition-all font-semibold"
+                        className="flex-1 pb-3 text-xs font-mono uppercase tracking-wider text-zinc-400 hover:text-zinc-900 dark:hover:white data-[state=active]:text-indigo-500 dark:data-[state=active]:text-indigo-400 data-[state=active]:border-b-2 data-[state=active]:border-indigo-500 transition-all font-semibold"
                       >
                         Community Ideas
                       </Tabs.Trigger>
                       <Tabs.Trigger 
                         value="saved" 
-                        className="flex-1 pb-3 text-xs font-mono uppercase tracking-wider text-zinc-400 hover:text-zinc-900 dark:hover:text-white data-[state=active]:text-indigo-500 dark:data-[state=active]:text-indigo-400 data-[state=active]:border-b-2 data-[state=active]:border-indigo-500 transition-all font-semibold flex items-center justify-center gap-1.5"
+                        className="flex-1 pb-3 text-xs font-mono uppercase tracking-wider text-zinc-400 hover:text-zinc-900 dark:hover:white data-[state=active]:text-indigo-500 dark:data-[state=active]:text-indigo-400 data-[state=active]:border-b-2 data-[state=active]:border-indigo-500 transition-all font-semibold flex items-center justify-center gap-1.5"
                       >
                         Saved
                         {savedProjects.length > 0 && (
@@ -932,13 +1095,6 @@ export default function DIYGenerator() {
                             {savedProjects.length}
                           </span>
                         )}
-                      </Tabs.Trigger>
-                      <Tabs.Trigger 
-                        value="premium" 
-                        className="flex-1 pb-3 text-xs font-mono uppercase tracking-wider text-indigo-400 hover:text-indigo-300 data-[state=active]:text-indigo-500 dark:data-[state=active]:text-indigo-400 data-[state=active]:border-b-2 data-[state=active]:border-indigo-500 transition-all font-semibold flex items-center justify-center gap-1"
-                      >
-                        <Sparkles className="w-3.5 h-3.5 fill-current" />
-                        Billing
                       </Tabs.Trigger>
                     </Tabs.List>
 
@@ -1071,7 +1227,7 @@ export default function DIYGenerator() {
                             type="text" 
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
-                            placeholder="Search projects by query (semantic vector matching)..."
+                            placeholder="Search projects in community database..."
                             className="flex-1 bg-white dark:bg-[#0a0a0c] border border-zinc-250 dark:border-zinc-850 rounded-xl px-4 py-3 text-xs text-zinc-950 dark:text-zinc-50 outline-none focus:border-indigo-500"
                           />
                         </div>
@@ -1107,39 +1263,6 @@ export default function DIYGenerator() {
                           ))}
                         </div>
                       )}
-                    </Tabs.Content>
-
-                    {/* Billing Upgrades Content */}
-                    <Tabs.Content value="premium" className="outline-none">
-                      <div className="bg-white dark:bg-[#0a0a0c] rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 sm:p-8 space-y-6 shadow-md text-center max-w-md mx-auto">
-                        <div className="w-12 h-12 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mx-auto mb-2">
-                          <Sparkles className="w-6 h-6 fill-current" />
-                        </div>
-                        <h2 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
-                          Unlock DIY Genius Premium
-                        </h2>
-                        <p className="text-xs text-zinc-500 leading-relaxed">
-                          Get unlimited scanning, DALL-E 3 visual previews, professional blueprint exports to PDF, and video tutorial script guides.
-                        </p>
-                        
-                        <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800/50">
-                          <span className="text-3xl font-extrabold text-zinc-950 dark:text-white">$9.99</span>
-                          <span className="text-xs text-zinc-500 font-mono"> / month</span>
-                        </div>
-
-                        {dbUser?.isPremium ? (
-                          <div className="py-2.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-mono uppercase tracking-wider font-semibold">
-                            You are a Premium Member
-                          </div>
-                        ) : (
-                          <button
-                            onClick={handleUpgrade}
-                            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-mono uppercase tracking-wider font-semibold transition-all hover:shadow-lg"
-                          >
-                            Upgrade Now via Stripe
-                          </button>
-                        )}
-                      </div>
                     </Tabs.Content>
                   </Tabs.Root>
                 </motion.div>

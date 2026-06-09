@@ -3,6 +3,8 @@ node_modules/
 /dist
 /build
 /.next
+/frontend/out
+/frontend/.next
 
 # Environment variables
 .env
