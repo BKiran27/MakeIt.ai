@@ -2,6 +2,7 @@
 @plugin "@tailwindcss/typography";
 
 @theme {
+  --font-display: var(--font-display);
   --animate-shimmer: shimmer 1.5s infinite;
   
   @keyframes shimmer {

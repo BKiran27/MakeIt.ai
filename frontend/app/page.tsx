@@ -975,97 +975,157 @@ export default function DIYGenerator() {
 
         {/* Auth form if not authenticated */}
         {!session && (
-          <div className="max-w-md mx-auto px-6 py-20">
-            <div className="bg-white dark:bg-[#0a0a0c] rounded-2xl border border-zinc-250 dark:border-zinc-850 p-6 sm:p-8 space-y-6 shadow-xl">
-              <div className="text-center space-y-2">
-                <h2 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
-                  {isSignUp ? 'Create SaaS Account' : 'Welcome Maker'}
-                </h2>
-                <p className="text-xs text-zinc-500">
-                  {isSignUp ? 'Sign up to build, scan, and generate DIY projects.' : 'Sign in to access your DIY Workspace.'}
+          <div className="min-h-[calc(100vh-4rem)] grid grid-cols-1 lg:grid-cols-12 max-w-6xl mx-auto px-4 sm:px-6 py-12 lg:py-20 gap-12 items-center">
+            {/* Left side: Premium Hero Branding & Value Props */}
+            <div className="lg:col-span-7 space-y-8 text-left">
+              <div className="space-y-4">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 text-xs font-semibold tracking-wide uppercase font-mono">
+                  <Sparkles className="w-3.5 h-3.5 fill-current" />
+                  AI Crafting & DIY Platform
+                </div>
+                <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-tight text-zinc-900 dark:text-white">
+                  Turn Leftover <br />
+                  Materials Into <span className="bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent">DIY Genius</span>
+                </h1>
+                <p className="text-sm sm:text-base text-zinc-550 dark:text-zinc-400 leading-relaxed max-w-xl">
+                  Analyze your available materials using computer vision, discover tailored project blueprints, and generate safety-first assembly guides instantly.
                 </p>
               </div>
 
-              <form onSubmit={handleAuth} className="space-y-4">
-                {isSignUp && (
+              {/* Feature Highlights */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-xl pt-4">
+                <div className="flex gap-3.5">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0 border border-emerald-500/20">
+                    <CheckCircle2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Material Detection</h4>
+                    <p className="text-[11px] text-zinc-500 leading-normal">Scan items using advanced computer vision.</p>
+                  </div>
+                </div>
+                <div className="flex gap-3.5">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0 border border-indigo-500/20">
+                    <CheckCircle2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-zinc-800 dark:text-zinc-200">AI Project Generation</h4>
+                    <p className="text-[11px] text-zinc-500 leading-normal">Tailor instructions to your difficulty level.</p>
+                  </div>
+                </div>
+                <div className="flex gap-3.5">
+                  <div className="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center shrink-0 border border-purple-500/20">
+                    <CheckCircle2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Visual Step Blueprints</h4>
+                    <p className="text-[11px] text-zinc-500 leading-normal">DALL-E 3 assembly cover illustrations.</p>
+                  </div>
+                </div>
+                <div className="flex gap-3.5">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0 border border-amber-500/20">
+                    <CheckCircle2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-zinc-800 dark:text-zinc-200">Premium SaaS Exports</h4>
+                    <p className="text-[11px] text-zinc-500 leading-normal">Download professional PDFs and script guides.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right side: Login Card */}
+            <div className="lg:col-span-5 w-full">
+              <div className="bg-white dark:bg-[#0a0a0c] rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 sm:p-8 space-y-6 shadow-xl hover:shadow-2xl transition-all duration-300">
+                <div className="text-center space-y-2">
+                  <h2 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white font-display">
+                    {isSignUp ? 'Create SaaS Account' : 'Welcome Maker'}
+                  </h2>
+                  <p className="text-xs text-zinc-550">
+                    {isSignUp ? 'Sign up to build, scan, and generate DIY projects.' : 'Sign in to access your DIY Workspace.'}
+                  </p>
+                </div>
+
+                <form onSubmit={handleAuth} className="space-y-4">
+                  {isSignUp && (
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-mono uppercase text-zinc-400">Full Name</label>
+                      <input 
+                        type="text" 
+                        required
+                        value={authName}
+                        onChange={e => setAuthName(e.target.value)}
+                        placeholder="John Doe"
+                        className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-zinc-950 dark:text-zinc-50 outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  )}
                   <div className="space-y-1">
-                    <label className="text-[10px] font-mono uppercase text-zinc-400">Full Name</label>
+                    <label className="text-[10px] font-mono uppercase text-zinc-400">Email Address</label>
                     <input 
-                      type="text" 
+                      type="email" 
                       required
-                      value={authName}
-                      onChange={e => setAuthName(e.target.value)}
-                      placeholder="John Doe"
+                      value={authEmail}
+                      onChange={e => setAuthEmail(e.target.value)}
+                      placeholder="maker@diygenius.ai"
                       className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-zinc-950 dark:text-zinc-50 outline-none focus:border-indigo-500"
                     />
                   </div>
-                )}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-mono uppercase text-zinc-400">Email Address</label>
-                  <input 
-                    type="email" 
-                    required
-                    value={authEmail}
-                    onChange={e => setAuthEmail(e.target.value)}
-                    placeholder="maker@diygenius.ai"
-                    className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-zinc-950 dark:text-zinc-50 outline-none focus:border-indigo-500"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-mono uppercase text-zinc-400">Password</label>
-                  <input 
-                    type="password" 
-                    required
-                    value={authPassword}
-                    onChange={e => setAuthPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-zinc-950 dark:text-zinc-50 outline-none focus:border-indigo-500"
-                  />
-                </div>
-
-                {error && (
-                  <div className="text-xs text-rose-500 bg-rose-500/5 border border-rose-500/10 p-2.5 rounded-lg flex items-center gap-1.5">
-                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                    <span>{error}</span>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-mono uppercase text-zinc-400">Password</label>
+                    <input 
+                      type="password" 
+                      required
+                      value={authPassword}
+                      onChange={e => setAuthPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-zinc-950 dark:text-zinc-50 outline-none focus:border-indigo-500"
+                    />
                   </div>
-                )}
 
-                <button
-                  type="submit"
-                  disabled={authLoading}
-                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-2"
-                >
-                  {authLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  {isSignUp ? 'Sign Up' : 'Sign In'}
-                </button>
-
-                {!isSignUp && (
-                  <>
-                    <div className="relative flex py-2 items-center">
-                      <div className="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
-                      <span className="flex-shrink mx-4 text-zinc-450 text-[10px] font-mono uppercase">Or</span>
-                      <div className="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
+                  {error && (
+                    <div className="text-xs text-rose-500 bg-rose-500/5 border border-rose-500/10 p-2.5 rounded-lg flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{error}</span>
                     </div>
+                  )}
 
-                    <button
-                      type="button"
-                      onClick={handleGuestLogin}
-                      className="w-full py-3 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900/60 dark:hover:bg-zinc-900 text-zinc-900 dark:text-white rounded-xl font-semibold text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-2 border border-zinc-200 dark:border-zinc-800/80 shadow-sm"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-500 fill-current" />
-                      Continue as Demo Guest
-                    </button>
-                  </>
-                )}
-              </form>
+                  <button
+                    type="submit"
+                    disabled={authLoading}
+                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {authLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    {isSignUp ? 'Sign Up' : 'Sign In'}
+                  </button>
 
-              <div className="text-center pt-2">
-                <button 
-                  onClick={() => { setIsSignUp(!isSignUp); setError(null); }}
-                  className="text-xs text-indigo-500 hover:underline"
-                >
-                  {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
-                </button>
+                  {!isSignUp && (
+                    <>
+                      <div className="relative flex py-2 items-center">
+                        <div className="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
+                        <span className="flex-shrink mx-4 text-zinc-450 text-[10px] font-mono uppercase font-semibold">Or</span>
+                        <div className="flex-grow border-t border-zinc-200 dark:border-zinc-800"></div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleGuestLogin}
+                        className="w-full py-3 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900/60 dark:hover:bg-zinc-900 text-zinc-900 dark:text-white rounded-xl font-semibold text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-2 border border-zinc-200 dark:border-zinc-800/80 shadow-sm cursor-pointer"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-500 fill-current" />
+                        Continue as Demo Guest
+                      </button>
+                    </>
+                  )}
+                </form>
+
+                <div className="text-center pt-2">
+                  <button 
+                    onClick={() => { setIsSignUp(!isSignUp); setError(null); }}
+                    className="text-xs text-indigo-500 hover:underline font-semibold cursor-pointer"
+                  >
+                    {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1085,7 +1145,7 @@ export default function DIYGenerator() {
                 >
                   {/* Hero Intro */}
                   <div className="text-center space-y-4">
-                    <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-zinc-900 dark:text-white leading-tight">
+                    <h1 className="font-display text-4xl sm:text-5xl font-extrabold tracking-tight text-zinc-900 dark:text-white leading-tight">
                       AI DIY Project <br />
                       <span className="bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent">Genius Creator</span>
                     </h1>
