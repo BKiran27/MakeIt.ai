@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: diy-genius-ai-backend
+    env: docker
+    dockerContext: backend
+    dockerfilePath: backend/Dockerfile
+    plan: free
+    envVars:
+      - key: PORT
+        value: 5000
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+        placeholder: "PostgreSQL Connection String (e.g. Supabase DB URL)"
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+        placeholder: "Supabase JWT secret for API Route Protection"
+      - key: OPENAI_API_KEY
+        sync: false
+        placeholder: "OpenAI API Key (starting with sk-)"
+      - key: STRIPE_SECRET_KEY
+        sync: false
+        placeholder: "Stripe Secret Key (starting with sk_)"
+      - key: STRIPE_PRICE_ID
+        sync: false
+        placeholder: "Stripe Price ID for Monthly SaaS Subscription"
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+        placeholder: "Stripe Webhook Secret for processing webhook callbacks"
+      - key: FRONTEND_URL
+        value: "https://bkiran27.github.io/MakeIt.ai"
