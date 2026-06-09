@@ -9,6 +9,11 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: false,
   },
   transpilePackages: ['motion'],
+  output: 'export',
+  basePath: process.env.NODE_ENV === 'production' ? '/MakeIt.ai' : '',
+  images: {
+    unoptimized: true,
+  },
   webpack: (config, {dev}) => {
     if (dev && process.env.DISABLE_HMR === 'true') {
       config.watchOptions = {
