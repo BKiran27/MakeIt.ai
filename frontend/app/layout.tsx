@@ -13,8 +13,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'MakeIt.ai | DIY Project Generator',
-  description: 'AI-powered DIY project generator and assistant.',
+  title: 'DIY Genius AI | Production-grade SaaS DIY Project Platform',
+  description: 'AI-powered DIY project generator, material scanner, and community workspace.',
 };
 
 export default function RootLayout({children}: {children: React.ReactNode}) {
